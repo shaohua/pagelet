@@ -1,0 +1,46 @@
+{
+  "name": "@howtox/pagelet",
+  "version": "0.2.0",
+  "description": "Publish agent-generated HTML reports for review, and pull the feedback back as Markdown your agent can act on.",
+  "keywords": [
+    "claude-code",
+    "coding-agent",
+    "code-review",
+    "html-report",
+    "feedback",
+    "cli"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shaohua/pagelet.git",
+    "directory": "cli"
+  },
+  "homepage": "https://github.com/shaohua/pagelet#readme",
+  "bugs": "https://github.com/shaohua/pagelet/issues",
+  "type": "module",
+  "bin": {
+    "pagelet": "./dist/index.js"
+  },
+  "files": [
+    "dist/index.js"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "bundle": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist/index.js",
+    "prepack": "npm run bundle",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run",
+    "pagelet": "node dist/index.js"
+  },
+  "devDependencies": {
+    "@pagelet/shared": "*",
+    "@types/node": "^22.15.32",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

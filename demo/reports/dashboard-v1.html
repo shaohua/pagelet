@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Q2 Revenue Dashboard</title>
+    <link rel="stylesheet" href="styles/report.css" />
+    <style>
+      body {
+        margin: 0;
+        font-family: Inter, system-ui, sans-serif;
+        background: #f8faf7;
+        color: #17211b;
+      }
+
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 48px 24px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 44px;
+        line-height: 1;
+      }
+
+      .panel {
+        margin-top: 28px;
+        border: 1px solid #d7dfd5;
+        border-radius: 8px;
+        background: white;
+        padding: 24px;
+      }
+
+      .bars {
+        display: grid;
+        gap: 12px;
+        margin-top: 20px;
+      }
+
+      .bar {
+        height: 32px;
+        border-radius: 4px;
+        background: linear-gradient(90deg, #316b4f var(--value), #edf3ed 0);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Q2 Revenue Dashboard</h1>
+      <p>Leadership review draft generated from local CSV fixtures.</p>
+      <img class="hero-chart" src="images/chart.svg" alt="Revenue trend preview" />
+      <section class="panel">
+        <h2>ARR by Month</h2>
+        <div class="bars" aria-label="ARR by month">
+          <div class="bar" style="--value: 62%"></div>
+          <div class="bar" style="--value: 74%"></div>
+          <div class="bar" style="--value: 81%"></div>
+        </div>
+      </section>
+      <script src="scripts/report.js"></script>
+    </main>
+  </body>
+</html>

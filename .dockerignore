@@ -1,0 +1,9 @@
+node_modules
+**/node_modules
+**/dist
+.git
+.pagelet-storage
+.env
+.env.*
+coverage
+**/*.tsbuildinfo

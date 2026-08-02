@@ -1,0 +1,33 @@
+{
+  "name": "pagelet",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm run build -w shared && npm run build -w cli && npm run build -w demo && npm run build -w web",
+    "dev": "npm run dev -w web",
+    "typecheck": "npm run typecheck -w shared && npm run typecheck -w cli && npm run typecheck -w demo && npm run typecheck -w web",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:contracts": "npm run test -w shared",
+    "test:cli": "npm run test -w cli",
+    "test:api": "npm run test -w web",
+    "demo:validate": "npm run validate -w demo",
+    "demo:smoke": "npm run smoke -w demo",
+    "smoke:deployed": "node demo/scripts/smoke-deployed.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.29.0",
+    "@types/node": "^22.15.32",
+    "eslint": "^9.29.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.34.1",
+    "vitest": "^3.2.4"
+  },
+  "workspaces": [
+    "shared",
+    "cli",
+    "demo",
+    "web"
+  ]
+}

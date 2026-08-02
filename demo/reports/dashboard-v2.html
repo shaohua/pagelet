@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Q2 Revenue Dashboard</title>
+    <link rel="stylesheet" href="styles/report.css" />
+    <style>
+      body {
+        margin: 0;
+        font-family: Inter, system-ui, sans-serif;
+        background: #f8faf7;
+        color: #17211b;
+      }
+
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 48px 24px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 44px;
+        line-height: 1;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-top: 28px;
+      }
+
+      .panel {
+        border: 1px solid #d7dfd5;
+        border-radius: 8px;
+        background: white;
+        padding: 24px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 16px;
+      }
+
+      td {
+        border-top: 1px solid #e5ebe3;
+        padding: 10px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Q2 Revenue Dashboard</h1>
+      <p>Revision with regional ARR context added from review feedback.</p>
+      <img class="hero-chart" src="images/chart.svg" alt="Revenue trend preview" />
+      <div class="grid">
+        <section class="panel">
+          <h2>ARR by Month</h2>
+          <p>Monthly ARR trend remains positive through Q2.</p>
+        </section>
+        <section class="panel">
+          <h2>Regional Breakdown</h2>
+          <table>
+            <tbody>
+              <tr><td>North America</td><td>$4.2M</td></tr>
+              <tr><td>EMEA</td><td>$2.1M</td></tr>
+              <tr><td>APAC</td><td>$1.4M</td></tr>
+            </tbody>
+          </table>
+        </section>
+      </div>
+      <script src="scripts/report.js"></script>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="220" viewBox="0 0 720 220" role="img" aria-label="Revenue trend line">
+  <rect width="720" height="220" rx="8" fill="#ffffff"/>
+  <path d="M48 172 C128 132 172 148 242 104 C318 58 378 96 444 70 C520 40 580 74 672 34" fill="none" stroke="#316b4f" stroke-width="12" stroke-linecap="round"/>
+  <g fill="#dfe8dd">
+    <rect x="48" y="186" width="624" height="2"/>
+    <rect x="48" y="142" width="624" height="2"/>
+    <rect x="48" y="98" width="624" height="2"/>
+    <rect x="48" y="54" width="624" height="2"/>
+  </g>
+</svg>

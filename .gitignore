@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.turbo/
+.env
+.env.*
+!.env.example
+.pagelet.publish.json
+.pagelet-storage/
+coverage/
+.playwright-cli/
+*.tsbuildinfo
+*.tgz

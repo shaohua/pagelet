@@ -1,0 +1,52 @@
+name: Release binaries
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  binaries:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Bundle the CLI
+        run: npm run bundle -w cli
+
+      - name: Compile standalone binaries
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          mkdir -p dist-bin
+          for target in linux-x64 linux-arm64 darwin-x64 darwin-arm64 windows-x64; do
+            out="dist-bin/pagelet-${target}"
+            if [ "${target}" = "windows-x64" ]; then
+              out="${out}.exe"
+            fi
+            bun build --compile --target="bun-${target}" \
+              --define PAGELET_VERSION="\"${version}\"" \
+              --define PAGELET_COMPILED=true \
+              cli/dist/index.js --outfile "${out}"
+          done
+          cd dist-bin && shasum -a 256 * > SHA256SUMS
+
+      - name: Attach binaries to the release
+        run: gh release upload "${GITHUB_REF_NAME}" dist-bin/* --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
