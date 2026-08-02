@@ -20,7 +20,7 @@
   "bugs": "https://github.com/shaohua/pagelet/issues",
   "type": "module",
   "bin": {
-    "pagelet": "./dist/index.js"
+    "pagelet": "dist/index.js"
   },
   "files": [
     "dist/index.js"
