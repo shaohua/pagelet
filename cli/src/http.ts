@@ -35,6 +35,18 @@ export async function readJsonResponse(response: Response): Promise<unknown> {
 
 export async function authHeaders(): Promise<Record<string, string>> {
   const token = process.env.PAGELET_TOKEN ?? (await readCliConfig())?.token;
+  const cloudRunToken = process.env.PAGELET_CLOUD_RUN_TOKEN?.trim();
+  const headers: Record<string, string> = {};
 
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  if (cloudRunToken) {
+    headers["X-Serverless-Authorization"] = `Bearer ${cloudRunToken}`;
+
+    if (token) {
+      headers["X-Pagelet-Token"] = token;
+    }
+  } else if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  return headers;
 }

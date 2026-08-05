@@ -49,7 +49,8 @@ export function getHelpText(): string {
 
     "Environment:",
     "  PAGELET_API_URL   Pagelet web/API base URL",
-    "  PAGELET_TOKEN     CLI bearer token for automation"
+    "  PAGELET_TOKEN     CLI bearer token for automation",
+    "  PAGELET_CLOUD_RUN_TOKEN Cloud Run IAM identity token"
   ].join("\n");
 }
 

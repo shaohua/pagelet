@@ -52,6 +52,19 @@ describe("auth helpers", () => {
     expect(session.user.email).toBe(demoUser.email);
   });
 
+  it("accepts a Pagelet token forwarded through a platform-safe header", async () => {
+    process.env.NODE_ENV = "development";
+    process.env.PAGELET_DEV_TOKEN = "expected-token";
+    const session = await requireCliAuth(
+      new Request("http://pagelet.test/api/pagelets", {
+        headers: { "X-Pagelet-Token": "expected-token" }
+      })
+    );
+
+    expect(session.method).toBe("dev_cli_token");
+    expect(session.user.email).toBe(demoUser.email);
+  });
+
   it("rejects missing or wrong CLI bearer tokens", async () => {
     process.env.NODE_ENV = "development";
     process.env.PAGELET_DEV_TOKEN = "expected-token";

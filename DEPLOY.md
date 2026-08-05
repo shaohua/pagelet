@@ -125,6 +125,33 @@ Check the deployed publish and review path:
 PAGELET_DEPLOYED_URL="$APP_BASE_URL" PAGELET_TOKEN="$PAGELET_DEV_TOKEN" npm run smoke:deployed
 ```
 
+## Cloud Run IAM
+
+If a Pagelet API endpoint requires Cloud Run IAM, CLI requests need both the
+Pagelet bearer token and a Cloud Run identity token. Set
+`PAGELET_CLOUD_RUN_TOKEN` when running `publish` or `feedback`:
+
+```sh
+PAGELET_API_URL="$APP_BASE_URL" \
+PAGELET_TOKEN="$PAGELET_TOKEN" \
+PAGELET_CLOUD_RUN_TOKEN="$CLOUD_RUN_TOKEN" \
+  pagelet publish report.html
+```
+
+The CLI sends the platform credential in `X-Serverless-Authorization`, which
+Cloud Run consumes, and sends the Pagelet token in
+`X-Pagelet-Token` for the application. Identity tokens expire, so
+obtain a fresh token before running a command. See Google Cloud's
+[Cloud Run authentication documentation](https://cloud.google.com/run/docs/authenticating/service-to-service)
+for supported ways to mint one.
+
+This also supports a split private deployment: put the reviewer-facing service
+behind IAP and expose a sibling CLI service only through Cloud Run IAM. Point
+both services at the same bucket and secrets. On the CLI service, keep
+`APP_BASE_URL` set to the IAP-protected reviewer origin and set
+`PAGELET_GCS_UPLOAD_MODE=signed-url`; set `PAGELET_API_URL` on clients to the
+IAM-protected service URL.
+
 ## Security
 
 Reports are untrusted HTML, rendered in sandboxed iframes under a restrictive

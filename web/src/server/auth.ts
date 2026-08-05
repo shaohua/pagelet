@@ -139,6 +139,12 @@ function expectedDevToken(): string {
 }
 
 function bearerToken(request: Request): string | null {
+  const forwardedToken = request.headers.get("x-pagelet-token")?.trim();
+
+  if (forwardedToken) {
+    return forwardedToken;
+  }
+
   const header = request.headers.get("authorization");
 
   if (!header) {
