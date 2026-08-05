@@ -1,39 +1,39 @@
 # Security Policy
 
-Pagelet is an open-source preview and is not yet production-hardened.
+Pagelet is open-source preview software and is not yet production-hardened.
 
-## Supported Versions
+## Reporting a vulnerability
 
-Only the current `main` branch receives security fixes during the preview
-period.
+Do not open a public issue. Use GitHub private vulnerability reporting and
+include impact and reproduction steps.
 
-## Reporting a Vulnerability
+## Current security model
 
-Please do not open a public issue for a suspected vulnerability.
+- The viewer Cloud Run service is protected by IAP by default. Setup grants
+  access only to configured Google Workspace or Cloud Identity domains.
+- Pagelet verifies IAP's signed assertion, expected Cloud Run audience, email
+  domain, and hosted-domain claim before serving data.
+- The creator Cloud Run service is reachable without Cloud Run invoker IAM so a
+  creator CLI needs neither gcloud nor Google OAuth credentials. It exposes no
+  viewer/report routes; publish and feedback routes require a Pagelet token.
+- CLI approval happens only in the IAP-protected viewer. Device codes use 128
+  bits of randomness. Creator tokens are stored hashed in the private bucket,
+  are scoped to creator operations, and expire after 30 days.
+- One private GCS bucket holds report HTML, assets, comments, and auth records.
+  Bucket access is equivalent to full Pagelet data access.
+- Published HTML runs in a sandboxed iframe without `allow-same-origin`, under
+  a restrictive Content Security Policy. A small injected bridge reports
+  selectors, selected text, and geometry to the parent viewer.
 
-Use GitHub private vulnerability reporting on this repository ("Report a
-vulnerability" under the Security tab). Include a concise description, impact,
-and reproduction steps.
+## Known preview limitations
 
-## Current Security Model
-
-Pagelet renders user-published HTML inside a sandboxed iframe. The viewer does
-not grant `allow-same-origin` to report iframes. Reports are served with a
-restrictive Content Security Policy, and inspector-style commenting uses a small
-injected iframe bridge for element geometry and anchors.
-
-Production deployments must provide:
-
-- A strong `SESSION_SECRET`.
-- Google OAuth client credentials when web login is enabled.
-- A private storage bucket. It holds the report HTML, assets, and Pagelet's
-  data documents, so bucket access is equivalent to full data access.
-- Carefully scoped allowed email domains.
-
-## Known Preview Limitations
-
+- Device-login start and poll must be anonymously reachable on the creator API.
+  Device codes are bearer secrets until they expire, so they must not be logged
+  or shared. These preview endpoints are not yet rate-limited.
+- Any member of an allowed work domain can view, comment, approve a creator
+  login, and therefore become a creator. There is no per-user creator allowlist.
+- Revoking a user in Google Workspace immediately removes viewer access, but an
+  already-issued creator token remains valid until its 30-day expiry unless its
+  auth record is removed from the bucket.
 - The local development auth path is for development and demos only.
-- `pagelet admin setup --auth dev-preview` deploys an instance that anyone with
-  the URL can read and comment on. It is for private validation only.
-- HTML rendering, CSP, sandboxing, and external asset allowlists need review for
-  each deployment's threat model.
+- CSP, sandbox, and external-origin changes require a threat-model review.

@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runAdmin } from "./index.js";
 import { createFakeAdmin, runServiceJson, type GcloudRoute } from "./testing.js";
 
-const LIVE_URL = "https://pagelet-123456.us-central1.run.app";
+const VIEWER_URL = "https://pagelet-123456.us-central1.run.app";
+const CREATOR_URL = "https://pagelet-creator-123456.us-central1.run.app";
 
 const PREFLIGHT: GcloudRoute[] = [
   { when: "--version", reply: { stdout: "Google Cloud SDK 500.0.0" } },
@@ -26,20 +27,38 @@ const PREFLIGHT: GcloudRoute[] = [
 const DEPLOYED: GcloudRoute[] = [
   ...PREFLIGHT,
   {
-    when: "run services describe",
+    when: "run services describe pagelet-creator",
     reply: {
       stdout: runServiceJson({
-        url: LIVE_URL,
+        url: CREATOR_URL,
         image:
-          "us-central1-docker.pkg.dev/demo-project/pagelet-upstream/shaohua/pagelet:0.1.1",
+          "us-central1-docker.pkg.dev/demo-project/pagelet-upstream/shaohua/pagelet:0.2.0",
+        env: { PAGELET_SURFACE: "creator" }
+      })
+    }
+  },
+  {
+    when: "run services describe pagelet --project",
+    reply: {
+      stdout: runServiceJson({
+        url: VIEWER_URL,
+        image:
+          "us-central1-docker.pkg.dev/demo-project/pagelet-upstream/shaohua/pagelet:0.2.0",
         env: {
-          PAGELET_DEPLOY_AUTH_MODE: "google",
+          PAGELET_SURFACE: "viewer",
           ALLOWED_EMAIL_DOMAINS: "example.com",
           GCS_BUCKET: "demo-project-pagelet"
         }
       })
     }
   }
+];
+
+const HEALTHY = [
+  { when: `${VIEWER_URL}/healthz`, status: 403 },
+  { when: `${CREATOR_URL}/healthz`, status: 200 },
+  { when: "/api/publish-config", status: 401 },
+  { when: "/r/not-public/1", status: 404 }
 ];
 
 describe("pagelet admin status", () => {
@@ -53,56 +72,42 @@ describe("pagelet admin status", () => {
   });
 
   afterEach(() => {
-    if (originalConfig === undefined) {
-      delete process.env.PAGELET_CONFIG;
-      return;
-    }
-
-    process.env.PAGELET_CONFIG = originalConfig;
+    if (originalConfig === undefined) delete process.env.PAGELET_CONFIG;
+    else process.env.PAGELET_CONFIG = originalConfig;
   });
 
-  it("reports the deployed instance", async () => {
-    const fake = createFakeAdmin({
-      gcloud: DEPLOYED,
-      fetch: [
-        { when: "run.app", status: 200 },
-        { when: "/api/publish-config", status: 401 }
-      ]
-    });
+  it("reports both surfaces and their protection", async () => {
+    const fake = createFakeAdmin({ gcloud: DEPLOYED, fetch: HEALTHY });
     const result = await runAdmin(["status", "--project", "demo-project"], fake.deps);
     const output = fake.io.lines.join("\n");
 
     expect(result.exitCode).toBe(0);
-    expect(output).toContain(LIVE_URL);
-    expect(output).toContain("0.1.1");
-    expect(output).toContain("google");
+    expect(output).toContain(VIEWER_URL);
+    expect(output).toContain(CREATOR_URL);
+    expect(output).toContain("0.2.0");
+    expect(output).toContain("Same image:");
+    expect(output).toContain("Same image:       yes");
+    expect(output).toContain("IAP viewer + Pagelet creator tokens");
     expect(output).toContain("example.com");
     expect(output).toContain("gs://demo-project-pagelet");
+    expect(output).toContain("403 (protected)");
     expect(output).toContain("401 (refused)");
-    expect(output).toContain("not logged in");
-    expect(fake.io.errors).toEqual([]);
+    expect(output).toContain("404 (absent)");
   });
 
-  it("recognises a machine that is logged in to this instance", async () => {
+  it("recognises a creator login on this machine", async () => {
     await writeFile(
       configPath,
-      JSON.stringify({ apiBaseUrl: LIVE_URL, token: "cli-token" })
+      JSON.stringify({ apiBaseUrl: CREATOR_URL, token: "cli-token" })
     );
-
-    const fake = createFakeAdmin({
-      gcloud: DEPLOYED,
-      fetch: [
-        { when: "run.app", status: 200 },
-        { when: "/api/publish-config", status: 401 }
-      ]
-    });
+    const fake = createFakeAdmin({ gcloud: DEPLOYED, fetch: HEALTHY });
     const result = await runAdmin(["status", "--project", "demo-project"], fake.deps);
 
     expect(result.exitCode).toBe(0);
     expect(fake.io.lines.join("\n")).toContain("logged in");
   });
 
-  it("points at setup when nothing is deployed", async () => {
+  it("points at setup when neither service is deployed", async () => {
     const fake = createFakeAdmin({ gcloud: PREFLIGHT });
     const result = await runAdmin(["status", "--project", "demo-project"], fake.deps);
 
@@ -110,7 +115,25 @@ describe("pagelet admin status", () => {
     expect(fake.io.errors.join("\n")).toContain("pagelet admin setup");
   });
 
-  it("reports an expired gcloud login instead of pretending nothing is deployed", async () => {
+  it("makes unsafe live responses visible", async () => {
+    const fake = createFakeAdmin({
+      gcloud: DEPLOYED,
+      fetch: [
+        { when: `${VIEWER_URL}/healthz`, status: 200 },
+        { when: `${CREATOR_URL}/healthz`, status: 200 },
+        { when: "/api/publish-config", status: 200 },
+        { when: "/r/not-public/1", status: 200 }
+      ]
+    });
+    const result = await runAdmin(["status", "--project", "demo-project"], fake.deps);
+
+    expect(result.exitCode).toBe(0);
+    expect(fake.io.lines.join("\n")).toContain("WARNING: not protected");
+    expect(fake.io.lines.join("\n")).toContain("WARNING: not refused");
+    expect(fake.io.lines.join("\n")).toContain("WARNING: exposed");
+  });
+
+  it("reports an expired gcloud login before checking services", async () => {
     const fake = createFakeAdmin({
       gcloud: [
         ...PREFLIGHT,
@@ -118,33 +141,14 @@ describe("pagelet admin status", () => {
           when: "projects describe",
           reply: {
             code: 1,
-            stderr:
-              "ERROR: There was a problem refreshing your current auth tokens: Reauthentication failed."
+            stderr: "ERROR: Reauthentication failed while refreshing auth tokens"
           }
         }
       ]
     });
     const result = await runAdmin(["status", "--project", "demo-project"], fake.deps);
-    const errors = fake.io.errors.join("\n");
 
     expect(result.exitCode).toBe(1);
-    expect(errors).toContain("gcloud auth login");
-    expect(errors).not.toContain("not deployed");
-  });
-
-  it("warns when the API answers without a token", async () => {
-    const fake = createFakeAdmin({
-      gcloud: DEPLOYED,
-      fetch: [
-        { when: "run.app", status: 200 },
-        { when: "/api/publish-config", status: 200 }
-      ]
-    });
-    const result = await runAdmin(["status", "--project", "demo-project"], fake.deps);
-
-    expect(result.exitCode).toBe(0);
-    expect(fake.io.errors.join("\n")).toContain(
-      "anyone with the URL can read and comment"
-    );
+    expect(fake.io.errors.join("\n")).toContain("gcloud auth login");
   });
 });

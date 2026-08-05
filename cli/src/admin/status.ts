@@ -1,7 +1,13 @@
 import { readCliConfig } from "../config.js";
 import type { AdminDeps } from "./deps.js";
 import { describeService, serviceEnv, serviceImage } from "./gcp.js";
-import { DEFAULT_REGION, DEFAULT_SERVICE, imageTag, trimTrailingSlash } from "./names.js";
+import {
+  DEFAULT_REGION,
+  DEFAULT_SERVICE,
+  creatorServiceName,
+  imageTag,
+  trimTrailingSlash
+} from "./names.js";
 import { preflight } from "./preflight.js";
 
 export type StatusOptions = {
@@ -14,84 +20,88 @@ export async function runStatus(args: string[], deps: AdminDeps): Promise<number
   const options = parseStatusArgs(args);
   const io = deps.io;
   const region = options.region ?? DEFAULT_REGION;
-  const service = options.service ?? DEFAULT_SERVICE;
+  const viewerService = options.service ?? DEFAULT_SERVICE;
+  const creatorService = creatorServiceName(viewerService);
   const { project } = await preflight(deps, options.project);
-  const deployed = await describeService(deps.gcloud, { project, region, service });
+  const [viewer, creator] = await Promise.all([
+    describeService(deps.gcloud, { project, region, service: viewerService }),
+    describeService(deps.gcloud, { project, region, service: creatorService })
+  ]);
 
-  if (!deployed) {
-    io.err(`Service ${service} is not deployed in ${project}/${region}.`);
+  if (!viewer && !creator) {
+    io.err(`Pagelet is not deployed in ${project}/${region}.`);
     io.err("Deploy it with: pagelet admin setup");
     return 1;
   }
 
-  const env = serviceEnv(deployed);
-  const url = trimTrailingSlash(deployed.status?.url ?? "");
-  const authMode = env.PAGELET_DEPLOY_AUTH_MODE ?? "unknown";
+  if (!viewer) io.err(`Viewer service ${viewerService} is missing.`);
+  if (!creator) io.err(`Creator service ${creatorService} is missing.`);
+
+  const primary = viewer ?? creator;
+  if (!primary) return 1;
+  const env = serviceEnv(primary);
+  const viewerUrl = trimTrailingSlash(viewer?.status?.url ?? "");
+  const creatorUrl = trimTrailingSlash(creator?.status?.url ?? "");
 
   io.out("");
-  io.out(statusLine("URL", url || "unknown"));
-  io.out(statusLine("Version", imageTag(serviceImage(deployed) ?? "") ?? "unknown"));
-  io.out(statusLine("Auth mode", authMode));
-  io.out(statusLine("Reviewer domains", env.ALLOWED_EMAIL_DOMAINS || "none"));
+  io.out(statusLine("Viewer", viewerUrl || "missing"));
+  io.out(statusLine("Creator API", creatorUrl || "missing"));
+  io.out(statusLine("Version", imageTag(serviceImage(primary) ?? "") ?? "unknown"));
+  if (viewer && creator) {
+    io.out(
+      statusLine(
+        "Same image",
+        serviceImage(viewer) === serviceImage(creator)
+          ? "yes"
+          : "no (WARNING: services have drifted)"
+      )
+    );
+  }
+  io.out(statusLine("Auth", "IAP viewer + Pagelet creator tokens"));
+  io.out(statusLine("Work domains", env.ALLOWED_EMAIL_DOMAINS || "none"));
   io.out(statusLine("Bucket", env.GCS_BUCKET ? `gs://${env.GCS_BUCKET}` : "unknown"));
 
-  if (!url) {
-    io.err("Cloud Run reported no URL for this service; skipping the live checks.");
-    return 0;
-  }
-
-  try {
-    const response = await deps.fetch(url);
-    io.out(statusLine("Health", `${response.status}`));
-  } catch (error) {
-    io.out(
-      statusLine(
-        "Health",
-        `unreachable (${error instanceof Error ? error.message : String(error)})`
-      )
+  if (viewerUrl) {
+    await reportCheck(deps, `${viewerUrl}/healthz`, "Viewer IAP", (status) =>
+      status === 302 || status === 401 || status === 403
+        ? `${status} (protected)`
+        : `${status} (WARNING: not protected)`
     );
   }
 
-  let worldReadable = false;
-
-  try {
-    const response = await deps.fetch(`${url}/api/publish-config`);
-    const refused = response.status === 401 || response.status === 403;
-    worldReadable = response.status >= 200 && response.status < 300;
-    io.out(
-      statusLine(
-        "Anonymous read",
-        refused ? `${response.status} (refused)` : `${response.status} (not refused)`
-      )
+  if (creatorUrl) {
+    await reportCheck(deps, `${creatorUrl}/healthz`, "Creator health", (status) =>
+      status >= 200 && status < 300 ? `${status} (healthy)` : `${status} (unhealthy)`
     );
-  } catch (error) {
-    io.out(
-      statusLine(
-        "Anonymous read",
-        `unknown (${error instanceof Error ? error.message : String(error)})`
-      )
+    await reportCheck(
+      deps,
+      `${creatorUrl}/api/publish-config`,
+      "Anonymous create",
+      (status) =>
+        status === 401 || status === 403
+          ? `${status} (refused)`
+          : `${status} (WARNING: not refused)`
+    );
+    await reportCheck(deps, `${creatorUrl}/r/not-public/1`, "Creator reports", (status) =>
+      status === 404 ? "404 (absent)" : `${status} (WARNING: exposed)`
     );
   }
 
   const config = await readCliConfig();
   const loggedIn =
-    Boolean(config?.token) && trimTrailingSlash(config?.apiBaseUrl ?? "") === url;
+    Boolean(config?.token) &&
+    Boolean(creatorUrl) &&
+    trimTrailingSlash(config?.apiBaseUrl ?? "") === creatorUrl;
   io.out(
     statusLine(
       "This machine",
-      loggedIn ? "logged in" : `not logged in (PAGELET_API_URL=${url} pagelet login)`
+      loggedIn
+        ? "logged in"
+        : creatorUrl
+          ? `not logged in (PAGELET_API_URL=${creatorUrl} pagelet login)`
+          : "creator service missing"
     )
   );
-
-  if (worldReadable) {
-    io.err("");
-    io.err("WARNING: anyone with the URL can read and comment on every report here.");
-    io.err(
-      authMode === "dev-preview"
-        ? "That is what dev-preview auth does. Move to --auth google before real review."
-        : "The instance answers the API without a token; check its auth configuration."
-    );
-  }
 
   return 0;
 }
@@ -103,28 +113,30 @@ export function parseStatusArgs(args: string[]): StatusOptions {
     const flag = args[index];
     const value = args[index + 1];
 
-    if (flag === "--project" && value) {
-      options.project = value;
-      index += 1;
-      continue;
-    }
-
-    if (flag === "--region" && value) {
-      options.region = value;
-      index += 1;
-      continue;
-    }
-
-    if (flag === "--service" && value) {
-      options.service = value;
-      index += 1;
-      continue;
-    }
-
-    throw new Error(`Unknown or incomplete admin status option: ${flag ?? ""}`);
+    if (flag === "--project" && value) options.project = value;
+    else if (flag === "--region" && value) options.region = value;
+    else if (flag === "--service" && value) options.service = value;
+    else throw new Error(`Unknown or incomplete admin status option: ${flag ?? ""}`);
+    index += 1;
   }
 
   return options;
+}
+
+async function reportCheck(
+  deps: AdminDeps,
+  url: string,
+  label: string,
+  describe: (status: number) => string
+): Promise<void> {
+  try {
+    const response = await deps.fetch(url, { redirect: "manual" });
+    deps.io.out(statusLine(label, describe(response.status)));
+  } catch (error) {
+    deps.io.out(
+      statusLine(label, `unreachable (${error instanceof Error ? error.message : String(error)})`)
+    );
+  }
 }
 
 function statusLine(label: string, value: string): string {

@@ -36,8 +36,10 @@ type CliTokenRecord = {
   userId: string;
   tokenHash: string;
   label: string | null;
+  scope?: "creator";
   identity?: AuthIdentity;
   createdAt: string;
+  expiresAt?: string;
   lastUsedAt: string | null;
 };
 
@@ -49,10 +51,12 @@ type AuthData = {
 };
 
 const AUTH_KEY = "auth";
+const CLI_TOKEN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 export async function startCliLogin(
   request: StartCliLoginRequest,
-  appBaseUrl: string
+  viewerBaseUrl: string,
+  creatorBaseUrl = viewerBaseUrl
 ): Promise<StartCliLoginResponse> {
   const now = new Date();
   const userCode = createUserCode();
@@ -70,9 +74,9 @@ export async function startCliLogin(
   });
 
   return {
-    verificationUrl: `${appBaseUrl}/cli-login/${userCode}`,
+    verificationUrl: `${viewerBaseUrl}/cli-login/${userCode}`,
     userCode,
-    pollUrl: `${appBaseUrl}/api/cli-login/poll`,
+    pollUrl: `${creatorBaseUrl}/api/cli-login/poll`,
     expiresAt
   };
 }
@@ -123,14 +127,17 @@ export async function pollCliLogin(
       organization: demoOrganization
     };
 
+    const createdAt = new Date();
     data.cliTokens.push({
       id: randomUUID(),
       orgId: identity.organization.id,
       userId: identity.user.id,
       tokenHash: hashSecret(token),
       label: session.label,
+      scope: "creator",
       identity,
-      createdAt: new Date().toISOString(),
+      createdAt: createdAt.toISOString(),
+      expiresAt: new Date(createdAt.getTime() + CLI_TOKEN_MAX_AGE_MS).toISOString(),
       lastUsedAt: null
     });
     session.status = "consumed";
@@ -152,7 +159,7 @@ export async function verifyCliToken(
   return updateAuthData<AuthIdentity | null>((data) => {
     const record = data.cliTokens.find((item) => item.tokenHash === tokenHash);
 
-    if (!record) {
+    if (!record || (record.expiresAt && Date.parse(record.expiresAt) <= Date.now())) {
       return null;
     }
 
@@ -168,19 +175,6 @@ export async function upsertIdentity(
   request: UpsertIdentityRequest
 ): Promise<AuthIdentity> {
   return updateAuthData((data) => upsertIdentityInData(data, request));
-}
-
-export async function loadIdentityByIds(
-  userId: string,
-  orgId: string
-): Promise<AuthIdentity | null> {
-  const data = await readAuthData();
-  return loadIdentityFromData(data, userId, orgId);
-}
-
-async function readAuthData(): Promise<AuthData> {
-  const document = await getDocumentStore().read<AuthData>(AUTH_KEY);
-  return document?.value ?? seedAuthData();
 }
 
 /**
@@ -307,5 +301,3 @@ function loadIdentityFromData(
 
   return { user, organization };
 }
-
-

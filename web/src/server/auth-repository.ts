@@ -18,7 +18,6 @@ export type UpsertIdentityRequest = {
 export {
   confirmCliLogin,
   hashSecret,
-  loadIdentityByIds,
   pollCliLogin,
   startCliLogin,
   upsertIdentity,

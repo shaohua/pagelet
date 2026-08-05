@@ -60,7 +60,13 @@ describe("pagelet admin destroy", () => {
     expect(output).toContain(`keep    bucket gs://${BUCKET}`);
     expect(output).toContain("--delete-data");
     expect(fake.gcloud.find("storage rm")).toBeUndefined();
-    expect(fake.gcloud.find("run services delete")).toBeDefined();
+    expect(
+      fake.gcloud.calls.filter(
+        ({ args }) => args[0] === "run" && args[1] === "services" && args[2] === "delete"
+      )
+    ).toHaveLength(2);
+    expect(fake.gcloud.find("run services delete pagelet ")).toBeDefined();
+    expect(fake.gcloud.find("run services delete pagelet-creator")).toBeDefined();
     expect(fake.gcloud.find("secrets delete pagelet-session-secret")).toBeDefined();
     expect(fake.gcloud.find("artifacts repositories delete")).toBeDefined();
     expect(fake.gcloud.find("service-accounts delete")).toBeDefined();

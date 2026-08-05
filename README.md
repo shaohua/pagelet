@@ -66,8 +66,8 @@ npm ci
 npm run dev
 ```
 
-`npm run dev` writes to `.pagelet-storage/` — no database, no bucket, no OAuth
-client. Publish the demo report:
+`npm run dev` writes to `.pagelet-storage/` — no database, bucket, or cloud
+credentials. Publish the demo report:
 
 ```sh
 PAGELET_API_URL=http://127.0.0.1:3000 PAGELET_TOKEN=dev-token \
@@ -100,10 +100,14 @@ Copy `.env.example` to `.env` for local overrides.
 
 - `PAGELET_DEV_AUTH=1` — local-only development auth.
 - `PAGELET_DEV_TOKEN` — local CLI bearer token.
-- `SESSION_SECRET` — required in production.
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google OAuth.
 - `ALLOWED_EMAIL_DOMAINS` — comma-separated allowed domains.
 - `PAGELET_STORAGE_BACKEND=gcs` and `GCS_BUCKET` — store in a bucket.
+- `PAGELET_SURFACE=viewer|creator|all` — select a production surface; local
+  development defaults to `all`.
+
+`pagelet admin setup` deploys two Cloud Run services from the same image. The
+viewer is protected by IAP; the creator API accepts scoped Pagelet CLI tokens.
+Creators do not need gcloud, and administrators do not create an OAuth client.
 
 ## Security
 

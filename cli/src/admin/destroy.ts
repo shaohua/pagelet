@@ -14,6 +14,7 @@ import {
   MANAGED_DESCRIPTION,
   SECRET_NAMES,
   UPSTREAM_REPO,
+  creatorServiceName,
   defaultBucket,
   serviceAccountEmail
 } from "./names.js";
@@ -37,32 +38,41 @@ export async function runDestroy(args: string[], deps: AdminDeps): Promise<numbe
   const options = parseDestroyArgs(args);
   const io = deps.io;
   const region = options.region ?? DEFAULT_REGION;
-  const service = options.service ?? DEFAULT_SERVICE;
+  const viewerService = options.service ?? DEFAULT_SERVICE;
+  const creatorService = creatorServiceName(viewerService);
   const { project } = await preflight(deps, options.project);
   const serviceAccount = serviceAccountEmail(project);
 
   const deletions: Deletion[] = [];
   const skips: string[] = [];
 
-  const deployed = await describeService(deps.gcloud, { project, region, service });
+  const [viewer, creator] = await Promise.all([
+    describeService(deps.gcloud, { project, region, service: viewerService }),
+    describeService(deps.gcloud, { project, region, service: creatorService })
+  ]);
 
-  if (deployed && isManaged(deployed.metadata?.labels)) {
-    deletions.push({
-      label: `Cloud Run service ${service}`,
-      args: [
-        "run",
-        "services",
-        "delete",
-        service,
-        "--project",
-        project,
-        "--region",
-        region,
-        "--quiet"
-      ]
-    });
-  } else if (deployed) {
-    skips.push(`Cloud Run service ${service}: not managed by pagelet admin`);
+  for (const [name, deployed] of [
+    [viewerService, viewer],
+    [creatorService, creator]
+  ] as const) {
+    if (deployed && isManaged(deployed.metadata?.labels)) {
+      deletions.push({
+        label: `Cloud Run service ${name}`,
+        args: [
+          "run",
+          "services",
+          "delete",
+          name,
+          "--project",
+          project,
+          "--region",
+          region,
+          "--quiet"
+        ]
+      });
+    } else if (deployed) {
+      skips.push(`Cloud Run service ${name}: not managed by pagelet admin`);
+    }
   }
 
   for (const name of SECRET_NAMES) {
@@ -124,10 +134,11 @@ export async function runDestroy(args: string[], deps: AdminDeps): Promise<numbe
 
   // Once the service is gone its GCS_BUCKET env is too, so a non-default
   // bucket can only be reached again through the flag.
+  const deployedForConfig = viewer ?? creator;
   const bucket =
     options.bucket ??
-    (deployed
-      ? serviceEnv(deployed).GCS_BUCKET || defaultBucket(project)
+    (deployedForConfig
+      ? serviceEnv(deployedForConfig).GCS_BUCKET || defaultBucket(project)
       : defaultBucket(project));
   const bucketResource = await describeBucket(deps.gcloud, project, bucket);
   const bucketManaged = Boolean(bucketResource && isManaged(bucketResource.labels));

@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { demoOrganization, demoUser } from "@pagelet/shared";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   confirmCliLogin,
   hashSecret,
@@ -16,6 +16,7 @@ const savedAllowedDomains = process.env.ALLOWED_EMAIL_DOMAINS;
 const storageDirs: string[] = [];
 
 afterEach(async () => {
+  vi.useRealTimers();
   if (savedStorageDir === undefined) {
     delete process.env.PAGELET_STORAGE_DIR;
   } else {
@@ -38,12 +39,15 @@ describe("auth store", () => {
     await useTempStorage();
     const started = await startCliLogin(
       { label: "Laptop" },
-      "http://127.0.0.1:3000"
+      "https://viewer.pagelet.test",
+      "https://creator.pagelet.test"
     );
 
     expect(started.verificationUrl).toBe(
-      `http://127.0.0.1:3000/cli-login/${started.userCode}`
+      `https://viewer.pagelet.test/cli-login/${started.userCode}`
     );
+    expect(started.userCode).toMatch(/^PL-[A-Z0-9_-]{22}$/);
+    expect(started.pollUrl).toBe("https://creator.pagelet.test/api/cli-login/poll");
     await expect(pollCliLogin({ userCode: started.userCode })).resolves.toEqual({
       status: "pending"
     });
@@ -109,6 +113,30 @@ describe("auth store", () => {
   it("hashes secrets without returning the raw value", () => {
     expect(hashSecret("secret-token")).toMatch(/^[a-f0-9]{64}$/);
     expect(hashSecret("secret-token")).not.toBe("secret-token");
+  });
+
+  it("expires newly issued creator tokens after 30 days", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+    await useTempStorage();
+    const started = await startCliLogin(
+      { label: "Temporary laptop" },
+      "https://viewer.pagelet.test",
+      "https://creator.pagelet.test"
+    );
+    await confirmCliLogin(started.userCode, {
+      user: demoUser,
+      organization: demoOrganization
+    });
+    const completed = await pollCliLogin({ userCode: started.userCode });
+
+    if (completed.status !== "complete") {
+      throw new Error("Expected completed login");
+    }
+    await expect(verifyCliToken(completed.token)).resolves.not.toBeNull();
+
+    vi.setSystemTime(new Date("2026-02-01T00:00:00.000Z"));
+    await expect(verifyCliToken(completed.token)).resolves.toBeNull();
   });
 });
 

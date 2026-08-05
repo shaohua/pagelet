@@ -5,9 +5,7 @@ export function hashSecret(secret: string): string {
 }
 
 export function createUserCode(): string {
-  return `${randomBytes(3).toString("base64url").toUpperCase()}-${randomBytes(3)
-    .toString("base64url")
-    .toUpperCase()}`;
+  return `PL-${randomBytes(16).toString("base64url").toUpperCase()}`;
 }
 
 export function createCliToken(): string {
