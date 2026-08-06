@@ -1,6 +1,6 @@
 {
   "name": "@howtox/pagelet",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Publish agent-generated HTML reports for review, and pull the feedback back as Markdown your agent can act on.",
   "keywords": [
     "claude-code",

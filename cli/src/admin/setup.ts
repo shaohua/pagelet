@@ -599,10 +599,10 @@ async function verifyDeployment(
   viewerUrl: string,
   creatorUrl: string
 ): Promise<void> {
-  await verifyStatus(ctx, `${viewerUrl}/healthz`, "viewer IAP", (status) =>
+  await verifyStatus(ctx, `${viewerUrl}/health`, "viewer IAP", (status) =>
     status === 302 || status === 401 || status === 403
   );
-  await verifyStatus(ctx, `${creatorUrl}/healthz`, "creator API health", (status) =>
+  await verifyStatus(ctx, `${creatorUrl}/health`, "creator API health", (status) =>
     status >= 200 && status < 300
   );
   await verifyStatus(ctx, `${creatorUrl}/api/publish-config`, "anonymous creator access refused", (status) =>

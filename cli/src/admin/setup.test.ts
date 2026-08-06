@@ -90,8 +90,8 @@ describe("pagelet admin setup", () => {
     const fake = createFakeAdmin({
       gcloud: DEPLOY_ROUTES,
       fetch: [
-        { when: `${VIEWER_URL}/healthz`, status: 403 },
-        { when: `${CREATOR_URL}/healthz`, status: 200 },
+        { when: `${VIEWER_URL}/health`, status: 403 },
+        { when: `${CREATOR_URL}/health`, status: 200 },
         { when: "/api/publish-config", status: 401 },
         { when: "/r/not-public/1", status: 404 }
       ]

@@ -46,7 +46,9 @@ export function createApp(
     }
   });
 
-  app.get("/healthz", (c) => c.json({ ok: true, surface }));
+  // Cloud Run reserves some paths ending in "z", which can catch conventional
+  // healthz probes, so keep this endpoint on an ordinary path.
+  app.get("/health", (c) => c.json({ ok: true, surface }));
 
   if (surface === "creator" || surface === "all") {
     registerCreatorRoutes(app);

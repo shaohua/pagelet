@@ -27,7 +27,7 @@ await cp(resolve(root, "demo/reports"), reportDir, { recursive: true });
 await rm(resolve(reportDir, ".pagelet.publish.json"), { force: true });
 
 try {
-  await expectStatus(new URL("/healthz", creator), 200);
+  await expectStatus(new URL("/health", creator), 200);
   await expectStatus(new URL("/api/publish-config", creator), 401);
   await expectStatus(new URL("/r/not-public/1", creator), 404);
 
@@ -52,7 +52,7 @@ try {
   assertIncludes(v2.stdout, "Version: 2", "second publish version");
 
   if (viewerUrl) {
-    const response = await fetch(new URL("/healthz", viewerUrl), {
+    const response = await fetch(new URL("/health", viewerUrl), {
       redirect: "manual"
     });
     if (![302, 401, 403].includes(response.status)) {

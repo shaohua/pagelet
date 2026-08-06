@@ -10,7 +10,7 @@ const surface = readSurface();
 const app = createApp({ surface });
 const port = Number(process.env.PORT ?? 3000);
 // Paths the server answers. Anything else is a client route.
-const serverPathPrefixes = ["/api", "/healthz", "/r"];
+const serverPathPrefixes = ["/api", "/health", "/r"];
 
 serve({ fetch: handleRequest, hostname: "0.0.0.0", port }, () => {
   console.log(`Pagelet web server listening on ${port}`);

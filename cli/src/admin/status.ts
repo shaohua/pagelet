@@ -62,7 +62,7 @@ export async function runStatus(args: string[], deps: AdminDeps): Promise<number
   io.out(statusLine("Bucket", env.GCS_BUCKET ? `gs://${env.GCS_BUCKET}` : "unknown"));
 
   if (viewerUrl) {
-    await reportCheck(deps, `${viewerUrl}/healthz`, "Viewer IAP", (status) =>
+    await reportCheck(deps, `${viewerUrl}/health`, "Viewer IAP", (status) =>
       status === 302 || status === 401 || status === 403
         ? `${status} (protected)`
         : `${status} (WARNING: not protected)`
@@ -70,7 +70,7 @@ export async function runStatus(args: string[], deps: AdminDeps): Promise<number
   }
 
   if (creatorUrl) {
-    await reportCheck(deps, `${creatorUrl}/healthz`, "Creator health", (status) =>
+    await reportCheck(deps, `${creatorUrl}/health`, "Creator health", (status) =>
       status >= 200 && status < 300 ? `${status} (healthy)` : `${status} (unhealthy)`
     );
     await reportCheck(
