@@ -15,10 +15,7 @@ import {
   handleFinalizeVersion,
   handleGetPagelet,
   handleGetPublishConfig,
-  handleGoogleCallback,
-  handleGoogleSignIn,
   handleListComments,
-  handleLogout,
   handlePollCliLogin,
   handleRenderVersion,
   handleRenderVersionAsset,
@@ -27,8 +24,13 @@ import {
   handleUploadDraftFile
 } from "./handlers";
 
-export function createApp(): Hono {
+export type PageletSurface = "viewer" | "creator" | "all";
+
+export function createApp(
+  options: Readonly<{ surface?: PageletSurface }> = {}
+): Hono {
   const app = new Hono({ strict: false });
+  const surface = options.surface ?? "all";
 
   app.use(async (c, next) => {
     // The store layer signals HTTP failures by throwing a Response. Hono only
@@ -44,17 +46,22 @@ export function createApp(): Hono {
     }
   });
 
+  app.get("/healthz", (c) => c.json({ ok: true, surface }));
+
+  if (surface === "creator" || surface === "all") {
+    registerCreatorRoutes(app);
+  }
+
+  if (surface === "viewer" || surface === "all") {
+    registerViewerRoutes(app);
+  }
+
+  return app;
+}
+
+function registerCreatorRoutes(app: Hono): void {
   app.get("/api/publish-config", (c) => handleGetPublishConfig(c.req.raw));
   app.post("/api/pagelets", (c) => handleCreatePagelet(c.req.raw));
-  app.get("/api/pagelets/:shareId", (c) =>
-    handleGetPagelet(c.req.raw, c.req.param())
-  );
-  app.get("/api/pagelets/:shareId/comments", (c) =>
-    handleListComments(c.req.raw, c.req.param())
-  );
-  app.post("/api/pagelets/:shareId/comments", (c) =>
-    handleCreateComment(c.req.raw, c.req.param())
-  );
   app.get("/api/pagelets/:shareId/feedback.md", (c) =>
     handleExportFeedback(c.req.raw, c.req.param())
   );
@@ -69,6 +76,18 @@ export function createApp(): Hono {
   );
   app.post("/api/cli-login/start", (c) => handleStartCliLogin(c.req.raw));
   app.post("/api/cli-login/poll", (c) => handlePollCliLogin(c.req.raw));
+}
+
+function registerViewerRoutes(app: Hono): void {
+  app.get("/api/pagelets/:shareId", (c) =>
+    handleGetPagelet(c.req.raw, c.req.param())
+  );
+  app.get("/api/pagelets/:shareId/comments", (c) =>
+    handleListComments(c.req.raw, c.req.param())
+  );
+  app.post("/api/pagelets/:shareId/comments", (c) =>
+    handleCreateComment(c.req.raw, c.req.param())
+  );
   app.post("/api/cli-login/confirm", (c) => handleConfirmCliLogin(c.req.raw));
   app.patch("/api/comment-threads/:threadId", (c) =>
     handleUpdateCommentThread(c.req.raw, c.req.param())
@@ -76,10 +95,6 @@ export function createApp(): Hono {
   app.post("/api/comment-threads/:threadId/replies", (c) =>
     handleCreateCommentReply(c.req.raw, c.req.param())
   );
-
-  app.get("/auth/google", (c) => handleGoogleSignIn(c.req.raw));
-  app.get("/auth/google/callback", (c) => handleGoogleCallback(c.req.raw));
-  app.post("/auth/logout", () => handleLogout());
 
   app.get("/r/:shareId/:versionNumber", (c) =>
     handleRenderVersion(c.req.raw, c.req.param())
@@ -90,8 +105,6 @@ export function createApp(): Hono {
       assetPath: assetPathOf(c.req.raw.url)
     })
   );
-
-  return app;
 }
 
 /**

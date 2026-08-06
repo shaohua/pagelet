@@ -24,27 +24,18 @@ import {
 } from "@pagelet/shared";
 import { reportContentSecurityPolicy } from "../security/render-policy";
 import {
-  assertAllowedEmailDomainForEmail,
   requireCliAuth,
   requirePageletAccess
 } from "./auth";
 import {
   confirmCliLogin,
   pollCliLogin,
-  startCliLogin,
-  upsertIdentity
+  startCliLogin
 } from "./auth-repository";
 import {
   getAllowedExternalOrigins,
   getPublicAppBaseUrl
 } from "./config";
-import {
-  buildGoogleAuthorizationUrl,
-  createOAuthState,
-  exchangeGoogleCode,
-  fetchGoogleProfile,
-  verifyOAuthState
-} from "./google-oauth";
 import { injectRenderBridge } from "./render-bridge";
 import {
   createCommentReply,
@@ -61,14 +52,6 @@ import {
   readVersionHtml,
   updateCommentThread
 } from "./repository";
-import {
-  clearOAuthStateCookie,
-  clearSessionCookie,
-  createOAuthStateCookie,
-  createSessionCookie,
-  createSessionPayload,
-  readOAuthStateCookie
-} from "./session";
 
 export async function handleGetPublishConfig(
   request: Request
@@ -202,7 +185,11 @@ export async function handleStartCliLogin(request: Request): Promise<Response> {
     (await request.json()) as StartCliLoginRequest
   );
   return Response.json(
-    await startCliLogin(body, getPublicAppBaseUrl(request.url))
+    await startCliLogin(
+      body,
+      getPublicAppBaseUrl(request.url),
+      new URL(request.url).origin
+    )
   );
 }
 
@@ -250,88 +237,6 @@ export async function handleCreateCommentReply(
     (await request.json()) as CreateCommentReplyRequest
   );
   return Response.json(await createCommentReply(params.threadId, body));
-}
-
-export async function handleGoogleSignIn(request: Request): Promise<Response> {
-  const requestUrl = new URL(request.url);
-  const appBaseUrl = getPublicAppBaseUrl(request.url);
-  const state = createOAuthState({
-    appBaseUrl,
-    returnTo: requestUrl.searchParams.get("returnTo")
-  });
-  const headers = new Headers({
-    Location: buildGoogleAuthorizationUrl({ appBaseUrl, state })
-  });
-
-  headers.append(
-    "Set-Cookie",
-    createOAuthStateCookie(state, {
-      secure: new URL(appBaseUrl).protocol === "https:"
-    })
-  );
-
-  return new Response(null, {
-    status: 302,
-    headers
-  });
-}
-
-export async function handleGoogleCallback(
-  request: Request
-): Promise<Response> {
-  const requestUrl = new URL(request.url);
-  const code = requestUrl.searchParams.get("code");
-  const state = requestUrl.searchParams.get("state");
-  const cookieState = readOAuthStateCookie(request);
-
-  if (!code || !state || !cookieState || state !== cookieState) {
-    throw new Response("Invalid Google OAuth state", { status: 400 });
-  }
-
-  const verifiedState = verifyOAuthState(state);
-
-  if (!verifiedState) {
-    throw new Response("Invalid Google OAuth state", { status: 400 });
-  }
-
-  const appBaseUrl = getPublicAppBaseUrl(request.url);
-  const accessToken = await exchangeGoogleCode(code, appBaseUrl);
-  const profile = await fetchGoogleProfile(accessToken);
-  assertAllowedEmailDomainForEmail(profile.email);
-  const identity = await upsertIdentity(profile);
-  const headers = new Headers({
-    Location: verifiedState.returnTo
-  });
-
-  headers.append(
-    "Set-Cookie",
-    createSessionCookie(
-      createSessionPayload({
-        userId: identity.user.id,
-        orgId: identity.organization.id,
-        email: identity.user.email
-      }),
-      {
-        secure: new URL(appBaseUrl).protocol === "https:"
-      }
-    )
-  );
-  headers.append("Set-Cookie", clearOAuthStateCookie());
-
-  return new Response(null, {
-    status: 302,
-    headers
-  });
-}
-
-export async function handleLogout(): Promise<Response> {
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: "/",
-      "Set-Cookie": clearSessionCookie()
-    }
-  });
 }
 
 export async function handleRenderVersion(

@@ -1,26 +1,26 @@
 import type { Organization, User } from "@pagelet/shared";
 import { demoOrganization, demoUser } from "@pagelet/shared";
-import { loadIdentityByIds, verifyCliToken } from "./auth-repository";
+import { upsertIdentity, verifyCliToken } from "./auth-repository";
 import { getAllowedEmailDomains } from "./config";
-import { readSessionPayload } from "./session";
+import { verifyIapRequest } from "./iap";
 
 export type AuthenticatedSession = {
   user: User;
   organization: Organization;
-  method: "cli_token" | "dev_cli_token" | "dev_web" | "web_session";
+  method: "cli_token" | "dev_cli_token" | "dev_web" | "iap";
 };
 
 type AuthOptions = {
   allowCliToken: boolean;
   allowDevWeb: boolean;
-  allowWebSession: boolean;
+  allowIap: boolean;
 };
 
 export async function requireCliAuth(request: Request): Promise<AuthenticatedSession> {
   return requireAuth(request, {
     allowCliToken: true,
     allowDevWeb: false,
-    allowWebSession: false
+    allowIap: false
   });
 }
 
@@ -28,17 +28,18 @@ export async function requirePageletAccess(
   request: Request
 ): Promise<AuthenticatedSession> {
   return requireAuth(request, {
-    allowCliToken: true,
+    allowCliToken:
+      process.env.PAGELET_SURFACE === "creator" ||
+      process.env.NODE_ENV !== "production",
     allowDevWeb: true,
-    allowWebSession: true
+    allowIap: true
   });
 }
 
 export function assertDevAuthProductionGuard(): void {
   if (
     process.env.NODE_ENV === "production" &&
-    process.env.PAGELET_DEV_AUTH === "1" &&
-    process.env.PAGELET_DEPLOY_AUTH_MODE !== "dev-preview"
+    process.env.PAGELET_DEV_AUTH === "1"
   ) {
     throw new Error("PAGELET_DEV_AUTH=1 is not allowed when NODE_ENV=production");
   }
@@ -81,23 +82,20 @@ async function requireAuth(
     }
   }
 
-  if (options.allowWebSession) {
-    const sessionPayload = readSessionPayload(request);
+  if (options.allowIap && isIapAuthEnabled()) {
+    const iap = await verifyIapRequest(request);
+    assertAllowedEmailDomainForEmail(iap.email);
+    assertAllowedHostedDomain(iap.hostedDomain);
+    const identity = await upsertIdentity({
+      email: iap.email,
+      name: null,
+      avatarUrl: null
+    });
 
-    if (sessionPayload) {
-      const identity = await loadIdentityByIds(
-        sessionPayload.userId,
-        sessionPayload.orgId
-      );
-
-      if (identity) {
-        assertAllowedEmailDomain(identity.user);
-        return {
-          ...identity,
-          method: "web_session"
-        };
-      }
-    }
+    return {
+      ...identity,
+      method: "iap"
+    };
   }
 
   if (isDevAuthEnabled()) {
@@ -111,6 +109,19 @@ async function requireAuth(
   }
 
   throw new Response("Authentication required", { status: 401 });
+}
+
+function isIapAuthEnabled(): boolean {
+  return process.env.PAGELET_DEPLOY_AUTH_MODE === "iap";
+}
+
+function assertAllowedHostedDomain(
+  hostedDomain: string | null,
+  allowedDomains = getAllowedEmailDomains()
+): void {
+  if (!hostedDomain || !allowedDomains.includes(hostedDomain.toLowerCase())) {
+    throw new Response("Google Workspace domain is not allowed", { status: 403 });
+  }
 }
 
 function devSession(method: AuthenticatedSession["method"]): AuthenticatedSession {

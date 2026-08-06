@@ -1,6 +1,10 @@
 export const DEFAULT_REGION = "us-central1";
 export const DEFAULT_SERVICE = "pagelet";
 
+export function creatorServiceName(viewerService: string): string {
+  return `${viewerService}-creator`;
+}
+
 export const MANAGED_LABEL_KEY = "pagelet-managed";
 export const MANAGED_LABEL_VALUE = "true";
 export const MANAGED_LABEL = `${MANAGED_LABEL_KEY}=${MANAGED_LABEL_VALUE}`;
@@ -15,6 +19,7 @@ export const UPSTREAM_REPO = "pagelet-upstream";
 export const UPSTREAM_REGISTRY = "https://ghcr.io";
 export const UPSTREAM_IMAGE_PATH = "shaohua/pagelet";
 
+/** Removed from deployments; retained so destroy can clean up old installs. */
 export const SESSION_SECRET_NAME = "pagelet-session-secret";
 export const GOOGLE_CLIENT_SECRET_NAME = "pagelet-google-client-secret";
 export const DEV_TOKEN_SECRET_NAME = "pagelet-dev-token";
@@ -27,10 +32,7 @@ export const SECRET_NAMES = [
 
 export const GCLOUD_INSTALL_URL = "https://cloud.google.com/sdk/docs/install";
 
-/**
- * Reviewer access is granted by email domain, so a shared consumer domain would
- * hand the instance to the whole internet.
- */
+/** IAP access is granted by domain, so shared consumer domains are unsafe. */
 export const PUBLIC_EMAIL_DOMAINS = [
   "gmail.com",
   "googlemail.com",

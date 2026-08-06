@@ -3,13 +3,14 @@
  * the app routes.
  */
 import { serve } from "@hono/node-server";
-import { createApp } from "./app";
+import { createApp, type PageletSurface } from "./app";
 import { serveAppShell, serveStaticAsset } from "./static-files";
 
-const app = createApp();
+const surface = readSurface();
+const app = createApp({ surface });
 const port = Number(process.env.PORT ?? 3000);
 // Paths the server answers. Anything else is a client route.
-const serverPathPrefixes = ["/api", "/auth", "/r"];
+const serverPathPrefixes = ["/api", "/healthz", "/r"];
 
 serve({ fetch: handleRequest, hostname: "0.0.0.0", port }, () => {
   console.log(`Pagelet web server listening on ${port}`);
@@ -17,6 +18,11 @@ serve({ fetch: handleRequest, hostname: "0.0.0.0", port }, () => {
 
 async function handleRequest(request: Request): Promise<Response> {
   const { pathname } = new URL(request.url);
+
+  if (surface === "creator" && !isServerPath(pathname)) {
+    return new Response("Not found", { status: 404 });
+  }
+
   const asset = await serveStaticAsset(pathname);
 
   if (asset) {
@@ -28,6 +34,16 @@ async function handleRequest(request: Request): Promise<Response> {
   }
 
   return serveAppShell();
+}
+
+function readSurface(): PageletSurface {
+  const configured = process.env.PAGELET_SURFACE?.trim();
+
+  if (configured === "viewer" || configured === "creator" || configured === "all") {
+    return configured;
+  }
+
+  return process.env.NODE_ENV === "production" ? "viewer" : "all";
 }
 
 function isServerPath(pathname: string): boolean {

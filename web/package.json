@@ -14,7 +14,8 @@
     "@google-cloud/storage": "^7.21.0",
     "@hono/node-server": "^2.0.12",
     "@pagelet/shared": "*",
-    "hono": "^4.12.33"
+    "hono": "^4.12.33",
+    "jose": "^6.2.8"
   },
   "devDependencies": {
     "@types/node": "^22.15.32",

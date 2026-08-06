@@ -1,133 +1,124 @@
 # Deploying Pagelet
 
-Pagelet is a single-tenant service: one organization runs one instance with
-its own object storage, auth configuration, and allowed email domains.
+Pagelet is a single-organization service. One codebase and one storage bucket
+back two Cloud Run services:
 
-There is no database. Reports, versions, comments, and CLI login state are
-JSON documents in the same bucket that holds the report files, so a deployment
-is one Cloud Run service and one bucket, it scales to zero, and there is
-nothing to pause between sessions — the bucket is billed for what it holds.
+| Service | Edge access | Routes |
+| --- | --- | --- |
+| `pagelet` | IAP; Workspace domain only | Viewer, reports, comments, CLI approval |
+| `pagelet-creator` | Reachable at the edge | Token-protected publish and feedback API, plus device-login start/poll |
 
-Deployment is driven by the `pagelet admin` commands in the CLI. For a
-guided first deployment, see [WALKTHROUGH.md](WALKTHROUGH.md).
+The creator service contains no report or viewer routes. Its useful API routes
+require a scoped Pagelet token. The viewer service never accepts that token as
+a way around IAP.
+
+This keeps the roles simple:
+
+- The admin needs `gcloud` to deploy and manage the instance.
+- A creator runs `pagelet login` once, approves it in the IAP-protected viewer,
+  and then uses the saved Pagelet token. They do not need `gcloud`.
+- A viewer signs in through IAP in the browser.
+- No one creates or owns a separate Google OAuth client for Pagelet.
 
 ## Prerequisites
 
 - A Google Cloud project with billing enabled.
-- The `gcloud` CLI, installed and authenticated (`gcloud auth login`).
+- An administrator with the `gcloud` CLI installed and authenticated.
+- A Google Cloud project attached to your Google Workspace or Cloud Identity
+  organization. This lets direct Cloud Run IAP use Google-managed OAuth
+  configuration; Pagelet intentionally does not fall back to a custom client.
+- A private work domain. Public domains such as `gmail.com` are intentionally
+  rejected.
 - Node.js 22+ to run the CLI.
 
 ## Deploy
 
 ```sh
 npm install -g @howtox/pagelet
-pagelet admin setup
+pagelet admin setup --project my-pagelet
 ```
 
-`setup` checks gcloud, your credentials, the project, and billing, prints a
-plan of the resources it will create, and asks for confirmation before it
-changes anything.
+Setup checks the project, prints its plan, and asks before changing anything.
+It creates or converges:
 
-The plan covers:
+- the required Run, Storage, IAM, Artifact Registry, and IAP APIs;
+- one `pagelet-run` runtime service account;
+- one private `<project>-pagelet` bucket;
+- an Artifact Registry remote repository for the released image; and
+- the IAP viewer and creator API services, using the same image.
 
-- Enabled APIs: `run`, `storage`, `secretmanager`, `artifactregistry`, `iam`,
-  `iamcredentials`.
-- A `pagelet-run` service account.
-- A `<project>-pagelet` bucket.
-- An Artifact Registry remote repository, `pagelet-upstream`, mirroring
-  `ghcr.io`. Cloud Run pulls the published
-  `ghcr.io/shaohua/pagelet:<version>` image through it.
-- Secret Manager secrets: an auto-generated `SESSION_SECRET`, plus
-  `GOOGLE_CLIENT_SECRET` or `PAGELET_DEV_TOKEN` depending on the auth mode.
-- The Cloud Run service, labeled `pagelet-managed=true`.
+IAP access is granted to the admin and every identity in the configured work
+domain. The creator service uses Cloud Run's invoker-IAM-check exemption so it
+also works in projects with Domain Restricted Sharing; authorization remains
+in the creator API.
 
-In `google` auth mode there is one manual step. Setup prints the exact
-redirect URI (`<base-url>/auth/google/callback`), you create a Web application
-OAuth client in the Google Cloud console with that URI, and setup prompts for
-the client ID and secret before the single deploy.
-
-`setup` is idempotent. Re-running it converges the deployment to the current
-flags, so upgrading is:
+Setup finishes by opening the same browser approval flow creators use and saves
+a creator token on the admin's machine. Re-running setup is the upgrade path:
 
 ```sh
 npm install -g @howtox/pagelet@latest
-pagelet admin setup
+pagelet admin setup --project my-pagelet
 ```
 
 ### Flags
 
 | Flag | Meaning |
 | --- | --- |
-| `--project` | Google Cloud project. Default: your gcloud config. |
-| `--region` | Cloud Run region. Default: `us-central1`. |
-| `--allow` | Comma-separated reviewer email domains. Default: the domain of your gcloud account. Required explicitly for public-provider accounts such as `gmail.com`. |
-| `--auth` | `google` or `dev-preview`. Default: `google`. |
-| `--domain` | Custom base URL for the service. |
+| `--project` | Google Cloud project; defaults to the gcloud config. |
+| `--region` | Cloud Run region; default `us-central1`. |
+| `--service` | Viewer service name; creator is derived as `<name>-creator`. |
+| `--allow` | Additional in-organization Workspace domains; the admin's domain is always included. |
+| `--domain` | Viewer URL after you configure a custom domain. |
 | `--bucket` | Bucket name. |
-| `--service` | Cloud Run service name. |
-| `--google-client-id`, `--google-client-secret` | Supply OAuth credentials and skip the interactive prompt. |
-| `--allowed-external-origins` | Origins reports may load assets from. |
-| `--source <dir>` | Deploy from a source checkout through Cloud Build instead of the published image. For forks. |
-| `--dry-run` | Print the plan and exit without changing anything. |
-| `--yes` | Skip the confirmation prompt. |
-| `--verbose` | Print the gcloud commands as they run. |
+| `--allowed-external-origins` | Extra origins report HTML may load from. |
+| `--image` | Deploy a different container image to both services. |
+| `--source <dir>` | Build a fork once with Cloud Build and reuse its image for both services. |
+| `--dry-run` | Print the plan without changing anything. |
+| `--yes` | Skip confirmation. |
+| `--verbose` | Echo gcloud commands. |
 
-`--auth dev-preview` deploys an instance where anyone with the URL can read
-and comment on every report. Use it for private validation only.
+## Add a creator machine
 
-## Inspect
+Copy the creator URL from setup or `pagelet admin status`, then run:
+
+```sh
+PAGELET_API_URL=https://pagelet-creator-123456.us-central1.run.app pagelet login
+```
+
+The CLI prints and opens an approval URL on the viewer service. IAP signs the
+creator in with their Workspace account; approving saves a 30-day Pagelet token
+locally. Subsequent `pagelet publish` and `pagelet feedback` commands use that
+token without gcloud.
+
+## Inspect and remove
 
 ```sh
 pagelet admin status
-```
-
-Reports the service URL, the deployed version, the auth mode, the bucket, and
-service health.
-
-## Remove
-
-```sh
 pagelet admin destroy
 ```
 
-Removes the managed resources: the Cloud Run service, the service account, the
-secrets, and the registry mirror. It only touches resources labeled
-`pagelet-managed=true`, and it never deletes the Google Cloud project.
+Status checks that the viewer is IAP-protected, anonymous creator operations
+are refused, and report routes are absent from the creator service.
 
-The bucket and its data are kept unless you pass `--delete-data`, which
-requires typing the bucket name to confirm (`--yes` skips both
-confirmations). If the service is already gone and the deployment used a
-non-default bucket name, name it with `--bucket`.
+Destroy removes both managed services, the runtime service account, and the
+registry mirror. It also cleans up legacy Pagelet secrets when present. The
+bucket and reports remain unless `--delete-data` is passed; Pagelet never
+deletes the Google Cloud project.
 
 ## Runtime configuration
 
-`pagelet admin setup` sets these on the Cloud Run service. They are also the
-environment variables to set if you deploy the container yourself.
+Setup configures both services with:
 
-- `SESSION_SECRET`: strong random session secret.
-- `APP_BASE_URL`: public origin of the deployed app.
-- `ALLOWED_EMAIL_DOMAINS`: comma-separated list of allowed email domains.
-- `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`: required for Google OAuth.
-- `GCS_BUCKET`: bucket holding report HTML, assets, and data documents.
-- `PAGELET_STORAGE_BACKEND=gcs`: store in the bucket rather than on local
-  disk. Without it, Pagelet writes to `.pagelet-storage/`, which is what
-  `npm run dev` uses and what a single-node deployment with a persistent disk
-  can use.
+- `PAGELET_SURFACE=viewer` or `creator`;
+- `PAGELET_DEPLOY_AUTH_MODE=iap`;
+- `APP_BASE_URL`, always pointing to the viewer;
+- `ALLOWED_EMAIL_DOMAINS`;
+- `PAGELET_STORAGE_BACKEND=gcs` and `GCS_BUCKET`; and
+- `PAGELET_IAP_AUDIENCE` on the viewer only.
 
-`PAGELET_DEV_AUTH=1` and `PAGELET_DEV_TOKEN` are development conveniences.
-Do not use preview auth for a public or production deployment.
+`PAGELET_DEV_AUTH` and `PAGELET_DEV_TOKEN` are local development conveniences
+and are always disabled by admin setup.
 
-## Smoke test
-
-Check the deployed publish and review path:
-
-```sh
-PAGELET_DEPLOYED_URL="$APP_BASE_URL" PAGELET_TOKEN="$PAGELET_DEV_TOKEN" npm run smoke:deployed
-```
-
-## Security
-
-Reports are untrusted HTML, rendered in sandboxed iframes under a restrictive
-Content Security Policy. Review `web/src/security/render-policy.ts`
-before changing allowed external origins or sandbox settings, and read
-[SECURITY.md](SECURITY.md) before deploying with sensitive data.
+Reports are untrusted HTML rendered in sandboxed iframes under a restrictive
+Content Security Policy. Read [SECURITY.md](SECURITY.md) before using sensitive
+data.

@@ -1,11 +1,7 @@
 import { useState } from "react";
 
 export function CliLoginPage({ userCode }: Readonly<{ userCode: string }>) {
-  const [status, setStatus] = useState<
-    "idle" | "approved" | "needs-sign-in" | "error"
-  >("idle");
-  const returnTo = `/cli-login/${encodeURIComponent(userCode)}`;
-  const googleLoginUrl = `/auth/google?returnTo=${encodeURIComponent(returnTo)}`;
+  const [status, setStatus] = useState<"idle" | "approved" | "error">("idle");
 
   async function approveLogin() {
     const response = await fetch("/api/cli-login/confirm", {
@@ -17,11 +13,6 @@ export function CliLoginPage({ userCode }: Readonly<{ userCode: string }>) {
     });
 
     if (!response.ok) {
-      if (response.status === 401) {
-        setStatus("needs-sign-in");
-        return;
-      }
-
       setStatus("error");
       return;
     }
@@ -43,11 +34,6 @@ export function CliLoginPage({ userCode }: Readonly<{ userCode: string }>) {
           <h2 id="login-title">Approve this CLI session</h2>
           <p>Only approve this request if you started `pagelet login`.</p>
         </div>
-        {status === "needs-sign-in" ? (
-          <a className="comment-mode-button" href={googleLoginUrl}>
-            Sign in with Google
-          </a>
-        ) : null}
         <button
           className="comment-mode-button"
           type="button"
@@ -58,9 +44,6 @@ export function CliLoginPage({ userCode }: Readonly<{ userCode: string }>) {
           Approve
         </button>
         {status === "approved" ? <p>Login approved. You can return to the CLI.</p> : null}
-        {status === "needs-sign-in" ? (
-          <p>Sign in with your allowed Google account, then approve again.</p>
-        ) : null}
         {status === "error" ? <p>Could not approve this login.</p> : null}
       </section>
     </main>
