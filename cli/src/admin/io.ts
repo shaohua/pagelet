@@ -1,6 +1,20 @@
 import { createInterface } from "node:readline/promises";
 import { Writable } from "node:stream";
 
+/**
+ * Shared by every admin command so a target reads the same everywhere. The
+ * "default" marker is the point: it tells the reader the value came from
+ * gcloud config rather than from their own flag.
+ */
+export function configLine(
+  label: string,
+  value: string,
+  flag: string,
+  explicit: boolean
+): string {
+  return `  ${label.padEnd(18)}${value}  (${explicit ? flag : `${flag}, default`})`;
+}
+
 export type AdminIo = {
   out(text: string): void;
   err(text: string): void;

@@ -13,6 +13,16 @@ type GcloudConfig = { core?: { project?: string } };
 type ProjectResource = { projectNumber?: string; lifecycleState?: string };
 type BillingInfo = { billingEnabled?: boolean };
 
+export type PreflightOptions = {
+  /**
+   * Commands that create or delete infrastructure set this. gcloud config is
+   * ambient state: another terminal can change it between runs, and --yes
+   * skips the prompt that would have shown the drift. Naming the project is
+   * how the operator states intent that cannot be inherited by accident.
+   */
+  requireProjectFlag?: boolean;
+};
+
 /**
  * gcloud, an active account, and a readable project: what every command needs.
  * The describe doubles as the token check — without it, an expired login would
@@ -20,11 +30,12 @@ type BillingInfo = { billingEnabled?: boolean };
  */
 export async function preflight(
   deps: AdminDeps,
-  projectFlag: string | undefined
+  projectFlag: string | undefined,
+  options: PreflightOptions = {}
 ): Promise<PreflightContext> {
   await requireGcloud(deps);
   const account = await requireActiveAccount(deps);
-  const project = await resolveProject(deps, projectFlag);
+  const project = await resolveProject(deps, projectFlag, options);
   const projectNumber = await requireProjectAccess(deps, project);
 
   return { account, project, projectNumber };
@@ -67,7 +78,8 @@ async function requireActiveAccount(deps: AdminDeps): Promise<string> {
 
 async function resolveProject(
   deps: AdminDeps,
-  projectFlag: string | undefined
+  projectFlag: string | undefined,
+  options: PreflightOptions
 ): Promise<string> {
   if (projectFlag) {
     deps.io.out(`ok    project ${projectFlag}`);
@@ -76,6 +88,19 @@ async function resolveProject(
 
   const config = await gcloudJson<GcloudConfig>(deps.gcloud, ["config", "list"]);
   const project = config?.core?.project;
+
+  // The value is reported rather than used: the operator has to see what they
+  // would have inherited before they retype it as a deliberate choice.
+  if (options.requireProjectFlag) {
+    throw new Error(
+      [
+        "This command requires --project.",
+        project
+          ? `Your gcloud default is ${project} — pass it explicitly if that is the target.`
+          : "You have no gcloud default project set."
+      ].join("\n")
+    );
+  }
 
   if (!project) {
     throw new Error(

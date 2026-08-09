@@ -6,8 +6,10 @@ import {
   describeService,
   describeServiceAccount,
   isManaged,
+  listManagedServiceRegions,
   serviceEnv
 } from "./gcp.js";
+import { configLine } from "./io.js";
 import {
   DEFAULT_REGION,
   DEFAULT_SERVICE,
@@ -40,7 +42,9 @@ export async function runDestroy(args: string[], deps: AdminDeps): Promise<numbe
   const region = options.region ?? DEFAULT_REGION;
   const viewerService = options.service ?? DEFAULT_SERVICE;
   const creatorService = creatorServiceName(viewerService);
-  const { project } = await preflight(deps, options.project);
+  const { project } = await preflight(deps, options.project, {
+    requireProjectFlag: true
+  });
   const serviceAccount = serviceAccountEmail(project);
 
   const deletions: Deletion[] = [];
@@ -74,6 +78,16 @@ export async function runDestroy(args: string[], deps: AdminDeps): Promise<numbe
       skips.push(`Cloud Run service ${name}: not managed by pagelet admin`);
     }
   }
+
+  // An empty region is ambiguous: nothing was ever deployed, or --region names
+  // the wrong one. Only the second case is a mistake, and without this check it
+  // exits 0 with "Nothing to delete" and reads as success.
+  const strandedRegions =
+    viewer || creator
+      ? []
+      : (await listManagedServiceRegions(deps.gcloud, project)).filter(
+          (found) => found !== region
+        );
 
   for (const name of SECRET_NAMES) {
     const secret = await describeSecret(deps.gcloud, project, name);
@@ -148,6 +162,18 @@ export async function runDestroy(args: string[], deps: AdminDeps): Promise<numbe
     skips.push(`bucket gs://${bucket}: not managed by pagelet admin`);
   }
 
+  // Destroy is the one irreversible command, so the target is named before the
+  // plan: without this the operator sees resource names but never the project
+  // that holds them, and an unflagged run silently follows gcloud config.
+  io.out("");
+  io.out("Configuration");
+  io.out(configLine("project", project, "--project", options.project !== undefined));
+  io.out(configLine("region", region, "--region", options.region !== undefined));
+  io.out(
+    configLine("viewer service", viewerService, "--service", options.service !== undefined)
+  );
+  io.out(`  ${"creator service".padEnd(18)}${creatorService}  (derived)`);
+
   io.out("");
   io.out("Plan");
 
@@ -167,10 +193,18 @@ export async function runDestroy(args: string[], deps: AdminDeps): Promise<numbe
     io.out(`  skipped ${skip}`);
   }
 
+  if (strandedRegions.length > 0) {
+    io.out("");
+    io.err(
+      `warn  no Pagelet services in ${region}, but managed services exist in ${strandedRegions.join(", ")}.`
+    );
+    io.err(`warn  re-run with --region ${strandedRegions[0]} to remove those.`);
+  }
+
   if (deletions.length === 0 && !deletingBucket) {
     io.out("");
     io.out("Nothing to delete.");
-    return 0;
+    return strandedRegions.length > 0 ? 1 : 0;
   }
 
   io.out("");

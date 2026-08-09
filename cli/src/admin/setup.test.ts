@@ -72,6 +72,25 @@ const DEPLOY_ROUTES: GcloudRoute[] = [
 ];
 
 describe("pagelet admin setup", () => {
+  it("refuses to run without --project, naming the default it did not use", async () => {
+    const fake = createFakeAdmin({
+      gcloud: [
+        {
+          when: "config list",
+          reply: { stdout: JSON.stringify({ core: { project: "some-other-project" } }) }
+        },
+        ...PREFLIGHT
+      ]
+    });
+    const result = await runAdmin(["setup"], fake.deps);
+    const errors = fake.io.errors.join("\n");
+
+    expect(result.exitCode).toBe(1);
+    expect(errors).toContain("requires --project");
+    expect(errors).toContain("some-other-project");
+    expect(fake.gcloud.mutations()).toEqual([]);
+  });
+
   it("prints a two-service plan without mutating anything in dry-run mode", async () => {
     const fake = createFakeAdmin({ gcloud: PREFLIGHT });
     const result = await runAdmin([...BASE_ARGS, "--dry-run"], fake.deps);

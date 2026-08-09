@@ -93,12 +93,21 @@ token without gcloud.
 ## Inspect and remove
 
 ```sh
-pagelet admin status
-pagelet admin destroy
+pagelet admin status --project my-pagelet
+pagelet admin destroy --project my-pagelet
 ```
 
 Status checks that the viewer is IAP-protected, anonymous creator operations
 are refused, and report routes are absent from the creator service.
+
+Setup and destroy require `--project`: they create or delete real
+infrastructure, so the target is never inherited from gcloud config. Read-only
+`status` still falls back to your gcloud default.
+
+Both also accept `--region` and `--service`, which do default. Region matters
+most for destroy: name the wrong one and it finds nothing. Destroy warns and
+exits non-zero when the target region is empty but managed services exist
+elsewhere in the project, so a mistyped region cannot read as success.
 
 Destroy removes both managed services, the runtime service account, and the
 registry mirror. It also cleans up legacy Pagelet secrets when present. The

@@ -35,6 +35,8 @@ export type ServiceAccountResource = {
   description?: string;
 };
 
+const LOCATION_LABEL = "cloud.googleapis.com/location";
+
 export function isManaged(labels: Record<string, string> | undefined): boolean {
   return labels?.[MANAGED_LABEL_KEY] === MANAGED_LABEL_VALUE;
 }
@@ -70,6 +72,37 @@ export function describeService(
     "--region",
     target.region
   ]);
+}
+
+/**
+ * Cloud Run carries the region as a Knative label, so one project-wide list
+ * finds deployments in regions the caller did not ask about. Destroy uses this
+ * to tell "nothing was ever deployed" apart from "you named the wrong region",
+ * which otherwise both read as an empty plan.
+ */
+export async function listManagedServiceRegions(
+  runner: GcloudRunner,
+  project: string
+): Promise<string[]> {
+  const services = await gcloudJson<RunService[]>(runner, [
+    "run",
+    "services",
+    "list",
+    "--project",
+    project
+  ]);
+  const regions = new Set<string>();
+
+  for (const service of services ?? []) {
+    const labels = service.metadata?.labels;
+    const region = labels?.[LOCATION_LABEL];
+
+    if (isManaged(labels) && region) {
+      regions.add(region);
+    }
+  }
+
+  return [...regions].sort();
 }
 
 export function describeBucket(

@@ -79,9 +79,13 @@ token works for publish and feedback for 30 days.
 
 ```sh
 pagelet admin status
-pagelet admin setup     # converge or upgrade both services
-pagelet admin destroy   # remove services; keep report data
+pagelet admin setup --project my-pagelet     # converge or upgrade both services
+pagelet admin destroy --project my-pagelet   # remove services; keep report data
 ```
+
+Setup and destroy require `--project`, and destroy also takes `--region` when
+the deployment is not in `us-central1`. Only `status` falls back to your gcloud
+default.
 
 Use `pagelet admin destroy --delete-data` only when the bucket and every report
 should also be deleted.

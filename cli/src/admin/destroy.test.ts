@@ -73,6 +73,75 @@ describe("pagelet admin destroy", () => {
     expect(output).toContain(`still in gs://${BUCKET}`);
   });
 
+  it("names the target project before the plan", async () => {
+    const fake = createFakeAdmin({ gcloud: MANAGED, confirms: [true] });
+    await runAdmin(BASE_ARGS, fake.deps);
+    const output = fake.io.lines.join("\n");
+
+    expect(output).toContain("Configuration");
+    expect(output).toContain("project           demo-project  (--project)");
+    expect(output.indexOf("Configuration")).toBeLessThan(output.indexOf("Plan"));
+  });
+
+  it("refuses to run without --project, naming the default it did not use", async () => {
+    const fake = createFakeAdmin({
+      gcloud: [
+        {
+          when: "config list",
+          reply: { stdout: JSON.stringify({ core: { project: "some-other-project" } }) }
+        },
+        ...MANAGED
+      ],
+      confirms: [true]
+    });
+    const result = await runAdmin(["destroy"], fake.deps);
+    const errors = fake.io.errors.join("\n");
+
+    expect(result.exitCode).toBe(1);
+    expect(errors).toContain("requires --project");
+    expect(errors).toContain("some-other-project");
+    expect(fake.gcloud.mutations()).toEqual([]);
+  });
+
+  it("warns when the target region is empty but services live elsewhere", async () => {
+    const fake = createFakeAdmin({
+      gcloud: [
+        ...PREFLIGHT,
+        {
+          when: "run services list",
+          reply: {
+            stdout: JSON.stringify([
+              {
+                metadata: {
+                  labels: {
+                    "pagelet-managed": "true",
+                    "cloud.googleapis.com/location": "us-west1"
+                  }
+                }
+              }
+            ])
+          }
+        }
+      ]
+    });
+    const result = await runAdmin(BASE_ARGS, fake.deps);
+    const errors = fake.io.errors.join("\n");
+
+    expect(result.exitCode).toBe(1);
+    expect(errors).toContain("no Pagelet services in us-central1");
+    expect(errors).toContain("us-west1");
+    expect(errors).toContain("--region us-west1");
+    expect(fake.gcloud.mutations()).toEqual([]);
+  });
+
+  it("stays quiet about other regions when the target region has services", async () => {
+    const fake = createFakeAdmin({ gcloud: MANAGED, confirms: [true] });
+    await runAdmin(BASE_ARGS, fake.deps);
+
+    expect(fake.io.errors.join("\n")).not.toContain("no Pagelet services");
+    expect(fake.gcloud.find("run services list")).toBeUndefined();
+  });
+
   it("deletes nothing when the typed bucket name does not match", async () => {
     const fake = createFakeAdmin({
       gcloud: MANAGED,

@@ -9,6 +9,7 @@ import {
   serviceImage
 } from "./gcp.js";
 import { echoingRunner } from "./gcloud.js";
+import { configLine } from "./io.js";
 import { checkBilling, preflight } from "./preflight.js";
 import {
   DEFAULT_REGION,
@@ -72,7 +73,9 @@ export async function runSetup(args: string[], deps: AdminDeps): Promise<number>
   const creatorService = creatorServiceName(viewerService);
 
   io.out("Preflight");
-  const { account, project, projectNumber } = await preflight(ctx, options.project);
+  const { account, project, projectNumber } = await preflight(ctx, options.project, {
+    requireProjectFlag: true
+  });
   await checkBilling(ctx, project);
   await requireOrganization(ctx, project);
 
@@ -699,10 +702,6 @@ async function mutate(ctx: AdminDeps, args: string[], stdin?: string): Promise<v
       [`Command failed: gcloud ${args.join(" ")}`, result.stderr.trim() || result.stdout.trim()].join("\n")
     );
   }
-}
-
-function configLine(label: string, value: string, flag: string, explicit: boolean): string {
-  return `  ${label.padEnd(18)}${value}  (${explicit ? flag : `${flag}, default`})`;
 }
 
 function planLine(action: "create" | "update" | "exists" | "enable", text: string): string {

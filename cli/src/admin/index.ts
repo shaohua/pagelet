@@ -9,12 +9,15 @@ export function getAdminHelpText(): string {
     "Pagelet admin: deploy Pagelet into your own Google Cloud project.",
     "",
     "Usage:",
-    "  pagelet admin setup [options]",
+    "  pagelet admin setup --project <id> [options]",
     "  pagelet admin status [--project id] [--region region] [--service name]",
-    "  pagelet admin destroy [--delete-data] [--bucket name] [--yes]",
+    "  pagelet admin destroy --project <id> [options]",
+    "",
+    "Setup and destroy always require --project: they create or delete real",
+    "infrastructure, so the target is never inherited from gcloud config.",
     "",
     "Setup options:",
-    "  --project <id>                    Project id (default: gcloud config)",
+    "  --project <id>                    Project id (required)",
     "  --region <region>                 Cloud Run region (default: us-central1)",
     "  --service <name>                  Service name (default: pagelet)",
     "  --bucket <name>                   Bucket name (default: <project>-pagelet)",
@@ -25,7 +28,15 @@ export function getAdminHelpText(): string {
     "  --source <dir>                    Build and deploy from source",
     "  --dry-run                         Print the plan and stop",
     "  --yes                             Do not ask for confirmation",
-    "  --verbose                         Echo each gcloud command"
+    "  --verbose                         Echo each gcloud command",
+    "",
+    "Destroy options:",
+    "  --project <id>                    Project to destroy in (required)",
+    "  --region <region>                 Cloud Run region (default: us-central1)",
+    "  --service <name>                  Viewer service name (default: pagelet)",
+    "  --bucket <name>                   Bucket to delete with --delete-data",
+    "  --delete-data                     Also delete the bucket and every report",
+    "  --yes                             Do not ask for confirmation"
   ].join("\n");
 }
 

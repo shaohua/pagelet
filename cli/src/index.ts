@@ -42,9 +42,9 @@ export function getHelpText(): string {
     "  pagelet publish <file> [--root dir] [--assets glob]",
     "  pagelet feedback [share_id]",
     "  pagelet feedback [share_id] --output pagelet-feedback.md",
-    "  pagelet admin setup [--project id] [--region region]",
+    "  pagelet admin setup --project <id> [--region region]",
     "  pagelet admin status",
-    "  pagelet admin destroy [--delete-data]",
+    "  pagelet admin destroy --project <id> [--delete-data]",
     "",
 
     "Environment:",
