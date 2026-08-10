@@ -4,7 +4,6 @@ dist/
 .env
 .env.*
 !.env.example
-.pagelet.publish.json
 .pagelet-storage/
 coverage/
 .playwright-cli/

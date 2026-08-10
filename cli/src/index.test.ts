@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { demoOrganization, demoUser } from "@pagelet/shared";
@@ -10,12 +10,14 @@ import {
   isPageletUploadUrl,
   runCli
 } from "./index.js";
+import { writePageBinding } from "./pages.js";
 
 // Keeps the poll loop from spending its real 2s between attempts.
 vi.mock("./wait.js", () => ({ sleep: () => Promise.resolve() }));
 
 const VERIFICATION_URL = "https://viewer.test/cli-login/PL-TESTCODE";
 const tempDirs: string[] = [];
+let configDir: string;
 
 function captureIo(): { io: AdminIo; lines: string[] } {
   const lines: string[] = [];
@@ -33,11 +35,12 @@ function jsonResponse(body: unknown): Response {
 }
 
 beforeEach(async () => {
-  const configDir = await mkdtemp(join(tmpdir(), "pagelet-cli-test-"));
+  configDir = await mkdtemp(join(tmpdir(), "pagelet-cli-test-"));
   tempDirs.push(configDir);
 
   // Without this the login test would overwrite the real ~/.pagelet/config.json.
   vi.stubEnv("PAGELET_CONFIG", join(configDir, "config.json"));
+  vi.stubEnv("PAGELET_PAGES", join(configDir, "pages.json"));
   vi.stubEnv("PAGELET_API_URL", "https://creator.test");
   vi.stubEnv("PAGELET_TOKEN", "");
   vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
@@ -98,6 +101,27 @@ describe("pagelet cli skeleton", () => {
 
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toContain("Usage: pagelet publish <file>");
+  });
+
+  it("resolves feedback from an HTML file", async () => {
+    const report = join(configDir, "report.html");
+    await writeFile(report, "<title>Report</title>");
+    await writePageBinding(report, {
+      shareId: "pl_report1",
+      title: "Report",
+      lastPublishedVersion: 1
+    });
+    vi.stubGlobal("fetch", async (input: RequestInfo | URL) => {
+      expect(String(input instanceof Request ? input.url : input)).toBe(
+        "https://creator.test/api/pagelets/pl_report1/feedback.md"
+      );
+      return new Response("# Pagelet Feedback\n", { status: 200 });
+    });
+
+    const result = await runCli(["feedback", report]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe("# Pagelet Feedback\n");
   });
 
   it("validates login options before making API requests", async () => {

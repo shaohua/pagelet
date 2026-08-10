@@ -20,11 +20,13 @@ if (!token) {
 
 const creator = new URL(creatorUrl);
 const reportDir = await mkdtemp(resolve(tmpdir(), "pagelet-deployed-reports-"));
+const reportPath = resolve(reportDir, "dashboard.html");
+const pageRegistryPath = resolve(reportDir, "pages.json");
 const cliPath = resolve(root, "cli/dist/index.js");
 
 await execFileAsync("npm", ["run", "build", "-w", "cli"], { cwd: root });
 await cp(resolve(root, "demo/reports"), reportDir, { recursive: true });
-await rm(resolve(reportDir, ".pagelet.publish.json"), { force: true });
+await cp(resolve(reportDir, "dashboard-v1.html"), reportPath);
 
 try {
   await expectStatus(new URL("/health", creator), 200);
@@ -36,16 +38,17 @@ try {
     throw new Error("Publish config did not include maxUploadBytes");
   }
 
-  const v1 = await runCli(["publish", resolve(reportDir, "dashboard-v1.html")]);
+  const v1 = await runCli(["publish", reportPath]);
   assertIncludes(v1.stdout, "Version: 1", "first publish version");
-  const shareId = parseShareId(parsePublishedUrl(v1.stdout));
+  parseShareId(parsePublishedUrl(v1.stdout));
 
-  const feedback = await runCli(["feedback", shareId]);
+  const feedback = await runCli(["feedback", reportPath]);
   assertIncludes(feedback.stdout, "# Pagelet Feedback", "feedback heading");
 
+  await cp(resolve(reportDir, "dashboard-v2.html"), reportPath);
   const v2 = await runCli([
     "publish",
-    resolve(reportDir, "dashboard-v2.html"),
+    reportPath,
     "--message",
     "Deployed creator smoke test"
   ]);
@@ -71,6 +74,7 @@ function runCli(args) {
     env: {
       ...process.env,
       PAGELET_API_URL: creator.origin,
+      PAGELET_PAGES: pageRegistryPath,
       PAGELET_TOKEN: token
     }
   });

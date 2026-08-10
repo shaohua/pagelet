@@ -12,6 +12,8 @@ const port = 3210;
 const apiUrl = `http://127.0.0.1:${port}`;
 const storageDir = await mkdtemp(resolve(tmpdir(), "pagelet-storage-"));
 const reportDir = await mkdtemp(resolve(tmpdir(), "pagelet-reports-"));
+const reportPath = resolve(reportDir, "dashboard.html");
+const pageRegistryPath = resolve(reportDir, "pages.json");
 const serverLog = [];
 
 await execFileAsync("npm", ["run", "build", "-w", "cli"], { cwd: workspaceRoot });
@@ -41,7 +43,7 @@ const cliPath = resolve(root, "../cli/dist/index.js");
 }
 
 await cp(resolve(root, "reports"), reportDir, { recursive: true });
-await rm(resolve(reportDir, ".pagelet.publish.json"), { force: true });
+await cp(resolve(reportDir, "dashboard-v1.html"), reportPath);
 
 const server = spawn(
   process.execPath,
@@ -63,10 +65,7 @@ server.stderr.on("data", (chunk) => serverLog.push(chunk.toString()));
 try {
   await waitForServer(`${apiUrl}/`);
 
-  const v1 = await runCli([
-    "publish",
-    resolve(reportDir, "dashboard-v1.html")
-  ]);
+  const v1 = await runCli(["publish", reportPath]);
   assertIncludes(v1.stdout, "Version: 1", "first publish version");
   const urlMatch = /^URL: (.+)$/m.exec(v1.stdout);
 
@@ -147,7 +146,7 @@ try {
     "Americas, EMEA, and APAC",
     "comment reply list"
   );
-  const feedback = await runCli(["feedback", shareId]);
+  const feedback = await runCli(["feedback", reportPath]);
   assertIncludes(feedback.stdout, "# Pagelet Feedback", "feedback heading");
   assertIncludes(
     feedback.stdout,
@@ -168,9 +167,10 @@ try {
     throw new Error("Thread did not resolve");
   }
 
+  await cp(resolve(reportDir, "dashboard-v2.html"), reportPath);
   const v2 = await runCli([
     "publish",
-    resolve(reportDir, "dashboard-v2.html"),
+    reportPath,
     "--message",
     "Address review comments"
   ]);
@@ -194,6 +194,7 @@ async function runCli(args) {
     env: {
       ...process.env,
       PAGELET_API_URL: apiUrl,
+      PAGELET_PAGES: pageRegistryPath,
       PAGELET_TOKEN: "dev-token"
     }
   });

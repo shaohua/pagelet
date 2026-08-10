@@ -47,8 +47,8 @@ pagelet publish report.html
 ```
 
 Relative images and CSS are uploaded with the HTML. Publishing the same file
-again creates the next version; `.pagelet.publish.json` beside the file keeps
-the binding.
+again creates the next version. Pagelet keeps the file-to-page association in
+`~/.pagelet/pages.json`.
 
 ## 4. Review and export feedback
 
@@ -58,7 +58,7 @@ to sign in, then they can read and comment on the report.
 Pull the comments back into the creator workflow:
 
 ```sh
-pagelet feedback <shareId>
+pagelet feedback report.html
 ```
 
 Address the feedback and publish the same file to create version 2.
