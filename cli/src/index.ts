@@ -14,7 +14,8 @@ import {
   type GetPublishConfigResponse
 } from "@pagelet/shared";
 import { runAdmin } from "./admin/index.js";
-import type { AdminDepsOverrides } from "./admin/deps.js";
+import { resolveAdminDeps, type AdminDepsOverrides } from "./admin/deps.js";
+import type { AdminIo } from "./admin/io.js";
 import { pollUntilComplete, startCliLogin } from "./cli-login.js";
 import { cliConfigPath, readCliConfig, writeCliConfig } from "./config.js";
 import { authHeaders, postJson, readJsonResponse } from "./http.js";
@@ -72,7 +73,7 @@ export async function runCli(
   }
 
   if (command === "login") {
-    return login(argv.slice(1));
+    return login(argv.slice(1), resolveAdminDeps(deps).io);
   }
 
   if (command === "feedback") {
@@ -136,25 +137,29 @@ async function feedback(args: string[]): Promise<CliResult> {
   }
 }
 
-async function login(args: string[]): Promise<CliResult> {
+/**
+ * The caller writes `CliResult.stdout` only after this resolves, and the poll
+ * loop below runs until the code expires. Buffering the verification URL into
+ * that result would hide it for the whole approval window — the one thing the
+ * user needs before they can approve anything. So stream the URL through `io`
+ * the moment we have it, and leave only the outcome for `stdout`.
+ */
+async function login(args: string[], io: AdminIo): Promise<CliResult> {
   try {
     const options = parseLoginArgs(args);
     const apiBaseUrl = await getApiBaseUrl();
     const started = await startCliLogin(apiBaseUrl, {
       label: options.label
     });
-    const intro = [
-      `Open: ${started.verificationUrl}`,
-      `Code: ${started.userCode}`
-    ];
+
+    io.out(`Open: ${started.verificationUrl}`);
+    io.out(`Code: ${started.userCode}`);
 
     if (options.noWait) {
-      return {
-        exitCode: 0,
-        stdout: `${intro.join("\n")}\n`,
-        stderr: ""
-      };
+      return { exitCode: 0, stdout: "", stderr: "" };
     }
+
+    io.out("Waiting for approval...");
 
     const completed = await pollUntilComplete(apiBaseUrl, started);
 
@@ -170,7 +175,6 @@ async function login(args: string[]): Promise<CliResult> {
     return {
       exitCode: 0,
       stdout: `${[
-        ...intro,
         `Logged in as ${completed.user.email}`,
         `Saved token to ${cliConfigPath()}`
       ].join("\n")}\n`,
