@@ -20,7 +20,12 @@ export type CreateDraftUploadTargetsInput = {
 };
 
 export type CreateDraftUploadUrlsInput = {
-  appBaseUrl: string;
+  /**
+   * The origin the CLI must PUT to. This is *this* service, not the viewer:
+   * the CLI only sends its token to the origin it already talks to, and in a
+   * split deployment the viewer refuses that token anyway.
+   */
+  uploadBaseUrl: string;
   draftId: string;
   expiresAt: string;
   targets: StoredUploadTarget[];
@@ -164,7 +169,7 @@ function createGcsStorageAdapter(): StorageAdapter {
 }
 
 function proxyDraftUploadUrls({
-  appBaseUrl,
+  uploadBaseUrl,
   draftId,
   expiresAt,
   targets
@@ -172,7 +177,7 @@ function proxyDraftUploadUrls({
   return targets.map((target, index) => ({
     originalPath: target.originalPath,
     gcsObject: target.gcsObject,
-    uploadUrl: `${appBaseUrl}/api/uploads/${draftId}/${index}`,
+    uploadUrl: `${uploadBaseUrl}/api/uploads/${draftId}/${index}`,
     expiresAt
   }));
 }

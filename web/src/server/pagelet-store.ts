@@ -84,7 +84,7 @@ export async function getPublishConfig(): Promise<GetPublishConfigResponse> {
 
 export async function createPageletDraft(
   request: CreatePageletDraftRequest,
-  appBaseUrl: string
+  uploadBaseUrl: string
 ): Promise<CreatePageletDraftResponse> {
   const now = new Date().toISOString();
   const shareId = createShareId();
@@ -120,13 +120,13 @@ export async function createPageletDraft(
   });
   await documents().write<StoredDraft>(draftKey(draft.id), draft, null);
 
-  return draftResponse(pagelet, draft, appBaseUrl);
+  return draftResponse(pagelet, draft, uploadBaseUrl);
 }
 
 export async function createVersionDraft(
   shareId: string,
   request: CreateVersionDraftRequest,
-  appBaseUrl: string
+  uploadBaseUrl: string
 ): Promise<CreatePageletDraftResponse> {
   const record = await requireRecord(shareId);
   const draft = createDraftRecord({
@@ -142,7 +142,7 @@ export async function createVersionDraft(
 
   await documents().write<StoredDraft>(draftKey(draft.id), draft, null);
 
-  return draftResponse(record.pagelet, draft, appBaseUrl);
+  return draftResponse(record.pagelet, draft, uploadBaseUrl);
 }
 
 export async function putDraftUpload(
@@ -729,7 +729,7 @@ function createDraftRecord({
 async function draftResponse(
   pagelet: Pagelet,
   draft: StoredDraft,
-  appBaseUrl: string
+  uploadBaseUrl: string
 ): Promise<CreatePageletDraftResponse> {
   return {
     pagelet,
@@ -738,7 +738,7 @@ async function draftResponse(
     plannedVersionNumber: draft.plannedVersionNumber,
     assetBasePath: "assets",
     uploadUrls: await getStorageAdapter().createDraftUploadUrls({
-      appBaseUrl,
+      uploadBaseUrl,
       draftId: draft.id,
       expiresAt: draft.expiresAt,
       targets: draft.uploadTargets

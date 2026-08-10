@@ -20,7 +20,7 @@ import {
 } from "./pagelet-store";
 import { getDocumentStore, resetDocumentStore } from "./document-store";
 
-const appBaseUrl = "http://127.0.0.1:3000";
+const baseUrl = "http://127.0.0.1:3000";
 const previousStorageDir = process.env.PAGELET_STORAGE_DIR;
 let storageDir: string;
 
@@ -68,6 +68,36 @@ describe("publishing", () => {
     });
   });
 
+  it("uploads to the creator origin while share links stay on the viewer", async () => {
+    const htmlBytes = Buffer.from("<!doctype html><title>Split hosts</title>");
+    const htmlFile = htmlDraftFile(htmlBytes);
+    const draft = await createPageletDraft(
+      { title: "Split hosts", files: [htmlFile] },
+      "https://creator.pagelet.test"
+    );
+
+    expect(draft.uploadUrls[0]!.uploadUrl).toBe(
+      `https://creator.pagelet.test/api/uploads/${draft.draftId}/0`
+    );
+
+    await putDraftUpload(draft.draftId, 0, toArrayBuffer(htmlBytes));
+    const finalized = await finalizeVersion(
+      draft.pagelet.shareId,
+      draft.draftId,
+      {
+        htmlObject: draft.uploadUrls[0]!.gcsObject,
+        assetManifest: [],
+        sha256: htmlFile.sha256,
+        sizeBytes: htmlFile.sizeBytes
+      },
+      "https://viewer.pagelet.test"
+    );
+
+    expect(finalized.url).toBe(
+      `https://viewer.pagelet.test/p/${draft.pagelet.shareId}`
+    );
+  });
+
   it("treats a repeated finalize as the same version", async () => {
     const { shareId, draftId, htmlObject, htmlFile } = await publish("Retry");
 
@@ -80,7 +110,7 @@ describe("publishing", () => {
         sha256: htmlFile.sha256,
         sizeBytes: htmlFile.sizeBytes
       },
-      appBaseUrl
+      baseUrl
     );
 
     expect(again.version.versionNumber).toBe(1);
@@ -94,7 +124,7 @@ describe("publishing", () => {
     const htmlFile = htmlDraftFile(htmlBytes);
     const draft = await createPageletDraft(
       { title: "Expired", files: [htmlFile] },
-      appBaseUrl
+      baseUrl
     );
 
     await expireDraft(draft.draftId);
@@ -113,7 +143,7 @@ describe("publishing", () => {
           sha256: htmlFile.sha256,
           sizeBytes: htmlFile.sizeBytes
         },
-        appBaseUrl
+        baseUrl
       ),
       410
     );
@@ -124,7 +154,7 @@ describe("publishing", () => {
     const htmlFile = htmlDraftFile(htmlBytes);
     const draft = await createPageletDraft(
       { title: "Mismatch", files: [htmlFile] },
-      appBaseUrl
+      baseUrl
     );
     await putDraftUpload(draft.draftId, 0, toArrayBuffer(htmlBytes));
 
@@ -138,7 +168,7 @@ describe("publishing", () => {
           sha256: sha256Hex(Buffer.from("something else")),
           sizeBytes: htmlFile.sizeBytes
         },
-        appBaseUrl
+        baseUrl
       ),
       400
     );
@@ -160,7 +190,7 @@ describe("publishing", () => {
 
     const draft = await createPageletDraft(
       { title: "Assets", files: [htmlFile, assetFile] },
-      appBaseUrl
+      baseUrl
     );
     await putDraftUpload(draft.draftId, 0, toArrayBuffer(htmlBytes));
     await putDraftUpload(draft.draftId, 1, toArrayBuffer(assetBytes));
@@ -183,7 +213,7 @@ describe("publishing", () => {
         sha256: htmlFile.sha256,
         sizeBytes: htmlFile.sizeBytes
       },
-      appBaseUrl
+      baseUrl
     );
 
     const served = await readVersionAsset(
@@ -332,7 +362,7 @@ describe("comments", () => {
 async function publish(title: string) {
   const htmlBytes = Buffer.from(`<!doctype html><title>${title}</title>`);
   const htmlFile = htmlDraftFile(htmlBytes);
-  const draft = await createPageletDraft({ title, files: [htmlFile] }, appBaseUrl);
+  const draft = await createPageletDraft({ title, files: [htmlFile] }, baseUrl);
   await putDraftUpload(draft.draftId, 0, toArrayBuffer(htmlBytes));
 
   const htmlObject = draft.uploadUrls[0]!.gcsObject;
@@ -345,7 +375,7 @@ async function publish(title: string) {
       sha256: htmlFile.sha256,
       sizeBytes: htmlFile.sizeBytes
     },
-    appBaseUrl
+    baseUrl
   );
 
   return {
@@ -360,7 +390,7 @@ async function publish(title: string) {
 async function publishVersion(shareId: string, title: string) {
   const htmlBytes = Buffer.from(`<!doctype html><title>${title}</title>`);
   const htmlFile = htmlDraftFile(htmlBytes);
-  const draft = await createVersionDraft(shareId, { files: [htmlFile] }, appBaseUrl);
+  const draft = await createVersionDraft(shareId, { files: [htmlFile] }, baseUrl);
   await putDraftUpload(draft.draftId, 0, toArrayBuffer(htmlBytes));
 
   return finalizeVersion(
@@ -372,7 +402,7 @@ async function publishVersion(shareId: string, title: string) {
       sha256: htmlFile.sha256,
       sizeBytes: htmlFile.sizeBytes
     },
-    appBaseUrl
+    baseUrl
   );
 }
 
