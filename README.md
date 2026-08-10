@@ -14,7 +14,7 @@ npm install -g @howtox/pagelet
 
 pagelet publish report.html      # → https://pagelet.example.com/p/pl_x7Kd2a
                                  #   teammates comment on the rendered page
-pagelet feedback pl_x7Kd2a       # → Markdown your agent can act on
+pagelet feedback report.html     # → Markdown your agent can act on
 ```
 
 Standalone binaries that need no Node.js are attached to each
@@ -48,8 +48,8 @@ roughly as many tokens as the comments themselves.
 [skills/pagelet/SKILL.md](skills/pagelet/SKILL.md) is an agent skill. Copy it
 into a project's `.claude/skills/pagelet/` to teach Claude Code the loop:
 publish the report, hand the URL to the reviewers and stop, then run
-`pagelet feedback` later and apply each item by its selector and kind before
-publishing the same file again as the next version.
+`pagelet feedback report.html` later and apply each item by its selector and
+kind before publishing the same file again as the next version.
 
 ## Status
 
@@ -79,8 +79,12 @@ choose what should change, and save. Then:
 
 ```sh
 PAGELET_API_URL=http://127.0.0.1:3000 PAGELET_TOKEN=dev-token \
-  npx @howtox/pagelet feedback <shareId>
+  npx @howtox/pagelet feedback demo/reports/dashboard-v1.html
 ```
+
+Each entry HTML file identifies one Pagelet. The CLI remembers the association
+in `~/.pagelet/pages.json`, so publishing that file again creates the next
+version while another HTML file creates a different Pagelet.
 
 To check the repository state: `npm run typecheck && npm run lint && npm test
 && npm run demo:smoke`.

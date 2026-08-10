@@ -40,11 +40,11 @@ environment, set `PAGELET_API_URL` and `PAGELET_TOKEN` instead.
 Later, when the user says the review is done:
 
 ```sh
-pagelet feedback <shareId>
+pagelet feedback report.html
 ```
 
-With no argument, run it from the directory that holds `.pagelet.publish.json`
-(written next to the published file) and the share ID is read from there.
+The entry HTML file identifies the Pagelet. A share ID can still be supplied
+directly when the original file is not available.
 
 ## Read the export
 
@@ -64,5 +64,5 @@ Items are ordered `blocking`, then `high`, then `normal`.
 ## Publish the next version
 
 After applying the items, publish the same file again. The binding in
-`.pagelet.publish.json` makes it version 2 of the same report, and reviewers
-see it at the same URL.
+`~/.pagelet/pages.json` makes it version 2 of the same report, and reviewers see
+it at the same URL. Publishing another HTML file creates a different Pagelet.

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import {
   createPageletDraftResponseSchema,
   createVersionDraftResponseSchema,
@@ -19,6 +19,7 @@ import type { AdminIo } from "./admin/io.js";
 import { pollUntilComplete, startCliLogin } from "./cli-login.js";
 import { cliConfigPath, readCliConfig, writeCliConfig } from "./config.js";
 import { authHeaders, postJson, readJsonResponse } from "./http.js";
+import { readPageBinding, writePageBinding } from "./pages.js";
 import {
   preparePublish,
   type ExternalAssetReference,
@@ -41,8 +42,8 @@ export function getHelpText(): string {
     "  pagelet --version",
     "  pagelet login",
     "  pagelet publish <file> [--root dir] [--assets glob]",
-    "  pagelet feedback [share_id]",
-    "  pagelet feedback [share_id] --output pagelet-feedback.md",
+    "  pagelet feedback <file|share_id>",
+    "  pagelet feedback <file|share_id> --output pagelet-feedback.md",
     "  pagelet admin setup --project <id> [--region region]",
     "  pagelet admin status",
     "  pagelet admin destroy --project <id> [--delete-data]",
@@ -50,7 +51,8 @@ export function getHelpText(): string {
 
     "Environment:",
     "  PAGELET_API_URL   Pagelet web/API base URL",
-    "  PAGELET_TOKEN     CLI bearer token for automation"
+    "  PAGELET_TOKEN     CLI bearer token for automation",
+    "  PAGELET_PAGES     Page registry path (default ~/.pagelet/pages.json)"
   ].join("\n");
 }
 
@@ -253,10 +255,9 @@ async function publish(args: string[]): Promise<CliResult> {
       prepared.externalReferences,
       publishConfig.allowedExternalOrigins
     );
-    const bindingPath = join(dirname(htmlPath), ".pagelet.publish.json");
     const binding = options.pagelet
       ? null
-      : await readPublishBinding(bindingPath);
+      : await readPageBinding(htmlPath);
     const shareId = options.pagelet ?? binding?.shareId;
     const uploadFiles = [prepared.html, ...prepared.assets];
     const draft = shareId
@@ -308,18 +309,11 @@ async function publish(args: string[]): Promise<CliResult> {
       finalizeRequest
     );
 
-    await writeFile(
-      bindingPath,
-      `${JSON.stringify(
-        {
-          shareId: finalized.pagelet.shareId,
-          title: finalized.pagelet.title,
-          lastPublishedVersion: finalized.version.versionNumber
-        },
-        null,
-        2
-      )}\n`
-    );
+    await writePageBinding(htmlPath, {
+      shareId: finalized.pagelet.shareId,
+      title: finalized.pagelet.title,
+      lastPublishedVersion: finalized.version.versionNumber
+    });
 
     const lines = [
       `Published ${finalized.pagelet.title}`,
@@ -491,9 +485,10 @@ function parseLoginArgs(args: string[]): LoginOptions {
 async function parseFeedbackArgs(args: string[]): Promise<FeedbackOptions> {
   const options: Partial<FeedbackOptions> = {};
   const rest = [...args];
+  let target: string | undefined;
 
   if (rest[0] && !rest[0].startsWith("--")) {
-    options.shareId = rest.shift();
+    target = rest.shift();
   }
 
   for (let index = 0; index < rest.length; index += 1) {
@@ -521,15 +516,20 @@ async function parseFeedbackArgs(args: string[]): Promise<FeedbackOptions> {
     throw new Error(`Unknown or incomplete feedback option: ${flag ?? ""}`);
   }
 
-  if (!options.shareId) {
-    const binding = await readPublishBinding(
-      join(process.cwd(), ".pagelet.publish.json")
-    );
-    options.shareId = binding?.shareId;
+  if (!target) {
+    throw new Error("Usage: pagelet feedback <file|share_id>");
   }
 
-  if (!options.shareId) {
-    throw new Error("Usage: pagelet feedback [share_id]");
+  if (/^pl_[a-zA-Z0-9_-]{6,}$/.test(target)) {
+    options.shareId = target;
+  } else {
+    const binding = await readPageBinding(target);
+
+    if (!binding) {
+      throw new Error(`No Pagelet is associated with ${resolve(target)}`);
+    }
+
+    options.shareId = binding.shareId;
   }
 
   return options as FeedbackOptions;
@@ -621,20 +621,4 @@ export function isPageletUploadUrl(uploadUrl: string, apiBaseUrl: string): boole
     upload.origin === api.origin &&
     upload.pathname.startsWith("/api/uploads/")
   );
-}
-
-type PublishBinding = {
-  shareId: string;
-  title: string;
-  lastPublishedVersion: number;
-};
-
-async function readPublishBinding(
-  bindingPath: string
-): Promise<PublishBinding | null> {
-  try {
-    return JSON.parse(await readFile(bindingPath, "utf8")) as PublishBinding;
-  } catch {
-    return null;
-  }
 }
