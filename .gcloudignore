@@ -1,0 +1,13 @@
+# Mirrors .dockerignore so `gcloud builds submit` uploads the same tree the
+# Dockerfile expects. Without this gcloud falls back to .gitignore and the
+# upload is far larger than the build needs.
+.git
+.gitignore
+node_modules
+**/node_modules
+**/dist
+.pagelet-storage
+.env
+.env.*
+coverage
+**/*.tsbuildinfo
