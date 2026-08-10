@@ -34,7 +34,8 @@ import {
 } from "./auth-repository";
 import {
   getAllowedExternalOrigins,
-  getPublicAppBaseUrl
+  getPublicAppBaseUrl,
+  getPublicRequestOrigin
 } from "./config";
 import { injectRenderBridge } from "./render-bridge";
 import {
@@ -188,7 +189,7 @@ export async function handleStartCliLogin(request: Request): Promise<Response> {
     await startCliLogin(
       body,
       getPublicAppBaseUrl(request.url),
-      new URL(request.url).origin
+      getPublicRequestOrigin(request)
     )
   );
 }
