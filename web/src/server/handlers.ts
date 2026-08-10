@@ -67,7 +67,7 @@ export async function handleCreatePagelet(request: Request): Promise<Response> {
     (await request.json()) as CreatePageletDraftRequest
   );
   return Response.json(
-    await createPageletDraft(body, getPublicAppBaseUrl(request.url))
+    await createPageletDraft(body, getPublicRequestOrigin(request))
   );
 }
 
@@ -145,7 +145,7 @@ export async function handleCreateVersion(
     await createVersionDraft(
       params.shareId,
       body,
-      getPublicAppBaseUrl(request.url)
+      getPublicRequestOrigin(request)
     )
   );
 }

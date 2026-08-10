@@ -97,7 +97,7 @@ describe("storage adapter", () => {
 
     await expect(
       getStorageAdapter().createDraftUploadUrls({
-        appBaseUrl: "http://127.0.0.1:3000",
+        uploadBaseUrl: "http://127.0.0.1:3000",
         draftId: "draft_1",
         expiresAt: "2026-01-01T00:10:00.000Z",
         targets: [target]
@@ -148,7 +148,7 @@ describe("storage adapter", () => {
 
     await expect(
       getStorageAdapter().createDraftUploadUrls({
-        appBaseUrl: "https://pagelet.example.com",
+        uploadBaseUrl: "https://pagelet.example.com",
         draftId: "draft_1",
         expiresAt: "2026-01-01T00:10:00.000Z",
         targets: [target]
