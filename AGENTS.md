@@ -1,4 +1,6 @@
-## Think Before Coding
-## Simplicity First
-## Surgical Changes
-## Goal-Driven Execution
+# Repository Guidelines
+
+- Think before coding.
+- Prefer simple solutions.
+- Make surgical changes.
+- Work toward the stated goal.

@@ -1,12 +1,12 @@
 # Contributing
 
-Thanks for helping improve Pagelet.
-
-Pagelet is currently an open-source preview. The most useful contributions are
-small, well-tested changes that keep the publish, review, feedback, and
-republish loop working.
+Keep changes focused, follow existing patterns, and add tests for behavior
+changes. Update documentation when commands, setup, security assumptions, or
+workflows change.
 
 ## Development
+
+Requires Node.js 22+.
 
 ```sh
 npm ci
@@ -16,30 +16,19 @@ npm test
 npm run demo:smoke
 ```
 
-For local web development:
+Run the local app with `npm run dev`. It uses development authentication and
+file-backed storage by default. `.env.example` lists optional environment
+variables; export overrides in the shell that starts the app.
 
-```sh
-npm run dev
-```
+## Pull requests
 
-The app uses local file-backed storage by default. Copy `.env.example` to
-`.env` only when you need to override defaults.
+- Explain the user-visible change.
+- Keep unrelated changes out of the pull request.
+- Include relevant tests and note what you ran.
+- Update affected docs.
 
-## Pull Requests
+## Issues
 
-- Keep changes focused.
-- Prefer existing patterns over new abstractions.
-- Include tests for behavior changes.
-- Run `npm run typecheck`, `npm run lint`, and the relevant tests before opening a PR.
-- Update README or docs when setup, security assumptions, or user workflows
-  change.
-
-## Reporting Issues
-
-Please include:
-
-- What you were trying to do.
-- The command or route you used.
-- Expected behavior.
-- Actual behavior, including logs or screenshots when helpful.
-- Your Node.js and npm versions.
+Include the command or route, expected and actual behavior, reproduction steps,
+relevant logs, and your Pagelet, Node.js, npm, and browser versions. Report
+security vulnerabilities privately as described in [SECURITY.md](SECURITY.md).

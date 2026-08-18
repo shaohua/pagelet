@@ -1,68 +1,47 @@
 ---
 name: pagelet
-description: Publish an HTML report, dashboard, or document to a shareable URL for human review, then pull the reviewers' comments back as Markdown and apply them. Use when the user asks to publish or share a report or page for review, get human feedback on work you generated, send something to reviewers, or collect, read, and apply review comments from a published report.
+description: Publish an HTML report, dashboard, or document for human review, then retrieve anchored comments as Markdown and apply them. Use when the user asks to share a generated page for review or collect feedback from one already published.
 ---
 
 # Pagelet
 
-Pagelet publishes an HTML file to a shareable URL where humans comment on the
-rendered page, then exports those comments as Markdown carrying a CSS selector
-and the exact quote for each item — so the comments can be applied without
-reopening the report.
-
-## When to use
-
-The user asks to publish or share a report, dashboard, or document for human
-review; asks for feedback from teammates on a page you produced; or asks to
-collect and apply reviewer feedback on a report already published.
+Use Pagelet to hand an HTML file to human reviewers and bring their anchored
+comments back into the editing workflow.
 
 ## Publish
 
-Requires the CLI: `npm install -g @howtox/pagelet`. If `pagelet` is not found,
-tell the user to install it instead of working around it.
+The `pagelet` CLI must be installed. If it is missing, ask the user to install
+it with `npm install -g @howtox/pagelet`; do not substitute another workflow.
 
 ```sh
 pagelet publish report.html
 ```
 
-It prints the title, the version number, and a `/p/<shareId>` URL. Relative
-assets referenced by the HTML (images, CSS) are uploaded with it.
+The command uploads referenced local assets and prints a `/p/<shareId>` URL.
+Give that URL to the user, explain that reviewers comment in the browser, and
+stop. Do not fetch the URL or wait for comments in the same turn.
 
-The URL is for the human reviewers, not for you. Give it to the user, say that
-reviewers comment on the rendered page in the browser, and stop. Do not fetch
-it, and do not wait for comments in the same turn.
+Authentication normally comes from a one-time `pagelet login`. Automation may
+instead set `PAGELET_API_URL` and `PAGELET_TOKEN`.
 
-Authentication comes from `pagelet login`, run once. In a non-interactive
-environment, set `PAGELET_API_URL` and `PAGELET_TOKEN` instead.
+## Collect and apply feedback
 
-## Collect the feedback
-
-Later, when the user says the review is done:
+When the user says review is complete:
 
 ```sh
 pagelet feedback report.html
 ```
 
-The entry HTML file identifies the Pagelet. A share ID can still be supplied
-directly when the original file is not available.
+A share ID also works if the original file is unavailable. Each item includes
+a CSS `Target` (or `whole report`) and may include quoted `Text`.
 
-## Read the export
+- `replace`: replace the anchored text with the requested replacement.
+- `delete`: remove the anchored content.
+- `change_request`: make the described change.
+- `question`: answer in chat; do not edit for that item.
+- `approve`: leave the content unchanged.
+- `note`: context only.
 
-Each item carries a `Target` — a CSS selector into the published HTML, or
-`whole report` — and, where available, the `Text` it wraps. The selector plus
-the quoted text identify the spot to edit. The kind names the edit:
-
-- `replace` — replace the anchored text with the replacement given in the item.
-- `delete` — remove the anchored content.
-- `change_request` — change the anchored content as the item describes.
-- `question` — answer it in chat; do not edit the report for that item.
-- `approve` — the anchored content is correct; leave it unchanged.
-- `note` — context only; no edit required.
-
-Items are ordered `blocking`, then `high`, then `normal`.
-
-## Publish the next version
-
-After applying the items, publish the same file again. The binding in
-`~/.pagelet/pages.json` makes it version 2 of the same report, and reviewers see
-it at the same URL. Publishing another HTML file creates a different Pagelet.
+Items are ordered by priority: `blocking`, `high`, then `normal`. Apply every
+actionable item, then publish the same file again. Its binding in
+`~/.pagelet/pages.json` creates the next version at the same URL.

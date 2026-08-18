@@ -1,94 +1,62 @@
-# Walkthrough: deploy Pagelet and run one review
+# Walkthrough
 
-This takes an empty Google Cloud project to one published report. Reference
-details are in [DEPLOY.md](DEPLOY.md).
+This takes a billed Google Cloud project to one reviewed report. See
+[DEPLOY.md](DEPLOY.md) for prerequisites and every option.
 
-## 1. Prepare the project
+## 1. Deploy
 
-Use an existing billed project, or create one:
+Authenticate `gcloud`, then preview and apply the plan:
 
 ```sh
 gcloud auth login
-gcloud projects create my-pagelet --name="Pagelet"
-gcloud billing accounts list
-gcloud billing projects link my-pagelet --billing-account=<ACCOUNT_ID>
-```
-
-The active account should belong to the Workspace domain that will use
-Pagelet. Setup rejects public email domains such as `gmail.com`.
-
-## 2. Preview and deploy
-
-```sh
 npm install -g @howtox/pagelet
 pagelet admin setup --project my-pagelet --dry-run
 pagelet admin setup --project my-pagelet
 ```
 
-The plan creates one bucket, one runtime identity, and two services from the
-same image:
+The project must belong to a Google Workspace or Cloud Identity organization.
+Setup creates the IAP-protected viewer, the token-protected creator API, and
+shared storage. On an interactive terminal it then opens a browser so you can
+approve this machine's creator token.
 
-- `pagelet`, the IAP-protected viewer;
-- `pagelet-creator`, the token-protected CLI API.
+To allow another organization domain, add `--allow example.com`. Forks can use
+`--source <dir>` to build once and deploy the resulting image to both services.
 
-There is no OAuth consent-screen or client-credential step. Setup configures
-IAP for the active admin and their work domain, verifies both surfaces, then
-opens a viewer page where the admin approves a creator token for this machine.
-
-To allow more than one work domain, deploy with for example
-`--allow example.com,subsidiary.example`.
-
-## 3. Publish
-
-Setup leaves the admin machine logged in:
+## 2. Publish and review
 
 ```sh
 pagelet publish report.html
 ```
 
-Relative images and CSS are uploaded with the HTML. Publishing the same file
-again creates the next version. Pagelet keeps the file-to-page association in
-`~/.pagelet/pages.json`.
+Share the printed viewer URL with someone in an allowed domain. Referenced
+local styles, scripts, and images are uploaded with the report. Publishing the
+same file again creates the next version at the same URL.
 
-## 4. Review and export feedback
-
-Send the printed viewer URL to a teammate in the allowed domain. IAP asks them
-to sign in, then they can read and comment on the report.
-
-Pull the comments back into the creator workflow:
+After review, export the comments:
 
 ```sh
 pagelet feedback report.html
 ```
 
-Address the feedback and publish the same file to create version 2.
+Apply the feedback, then publish the same file again.
 
-## 5. Add another creator
-
-Creators install only Pagelet, not gcloud:
+## 3. Add another creator
 
 ```sh
 npm install -g @howtox/pagelet
-PAGELET_API_URL=<creator-url-from-admin-status> pagelet login
+PAGELET_API_URL=<creator-url> pagelet login
 ```
 
-They approve the request in their browser behind IAP. The resulting local
-token works for publish and feedback for 30 days.
+The creator URL is printed by setup and `pagelet admin status`. Approval occurs
+on the viewer behind IAP; the saved token expires after 30 days.
 
-## 6. Operate it
+## 4. Operate or remove
 
 ```sh
-pagelet admin status
-pagelet admin setup --project my-pagelet     # converge or upgrade both services
-pagelet admin destroy --project my-pagelet   # remove services; keep report data
+pagelet admin status --project my-pagelet
+pagelet admin setup --project my-pagelet
+pagelet admin destroy --project my-pagelet
 ```
 
-Setup and destroy require `--project`, and destroy also takes `--region` when
-the deployment is not in `us-central1`. Only `status` falls back to your gcloud
-default.
-
-Use `pagelet admin destroy --delete-data` only when the bucket and every report
-should also be deleted.
-
-Forks can use `--source <dir>`; setup builds once with Cloud Build and deploys
-the resulting image to both services.
+Destroy keeps report data by default. Add `--delete-data` only when the bucket
+and everything in it should also be deleted.

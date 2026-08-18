@@ -1,6 +1,6 @@
 ## Summary
 
-- 
+-
 
 ## Verification
 
@@ -11,4 +11,4 @@
 
 ## Notes
 
-- 
+-
