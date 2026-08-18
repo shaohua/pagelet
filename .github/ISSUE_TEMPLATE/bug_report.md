@@ -8,9 +8,7 @@ assignees: ""
 
 ## What happened?
 
-
 ## What did you expect?
-
 
 ## How can we reproduce it?
 
@@ -26,5 +24,3 @@ assignees: ""
 - Pagelet version or commit:
 
 ## Extra context
-
-

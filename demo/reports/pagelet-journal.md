@@ -1,33 +1,17 @@
-# Report Recipe
+# Demo Report Notes
 
 ## Goal
 
-Create a Q2 revenue dashboard for leadership review.
+Show a Q2 revenue dashboard moving through one review-driven revision.
 
-## Inputs
+## Fixtures
 
-- `data/q2_revenue.csv`
-- Closed-won accounts only
-
-## Transformations
-
-- Grouped ARR by month
-- Calculated regional split from billing country
-
-## Generated Views
-
-- ARR by month chart
-- Regional breakdown table
+- `dashboard-v1.html` shows the initial ARR-by-month view.
+- `dashboard-v2.html` adds regional ARR context.
+- `styles/report.css`, `scripts/report.js`, and `images/` exercise local asset
+  publishing.
 
 ## Assumptions
 
-- Revenue is recognized by close date
-
-## Limitations
-
-- Region is inferred from billing country
-
-## Chat Recap
-
-- User asked for a leadership dashboard focused on ARR and regional breakdowns
-- Agent generated the report from local demo data
+- All figures are illustrative demo data.
+- Version 2 represents feedback applied to version 1.

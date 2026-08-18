@@ -8,13 +8,8 @@ assignees: ""
 
 ## Problem
 
-
 ## Proposed shape
-
 
 ## Alternatives considered
 
-
 ## Extra context
-
-
